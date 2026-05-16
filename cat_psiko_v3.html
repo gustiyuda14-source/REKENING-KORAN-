@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CATpsiko — Sistem Evaluasi Komputasi</title>
+
+    <!-- ✅ FIX 1: <link> preload, bukan @import di dalam <style>
+         @import memblokir render di iOS Safari -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ✅ FIX 2: CSS variable --app-h di-set via JS berdasarkan window.innerHeight
+           100dvh / 100vh keduanya salah di iOS Safari ketika address bar muncul/hilang */
+        :root { --app-h: 100vh; }
+
+        *, *::before, *::after {
+            -webkit-font-smoothing: antialiased;
+            /* ✅ FIX 3: Matikan text selection global — iOS sangat sering trigger ini
+               saat long-press numpad, menyebabkan janky selection overlay */
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Input text boleh dipilih */
+        input { -webkit-user-select: text; user-select: text; }
+
+        html, body {
+            /* ✅ FIX 4: overscroll-behavior dengan prefix lengkap */
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: auto;
+            overflow: hidden;
+            height: 100%;
+            touch-action: none;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* ✅ FIX 5: App container pakai --app-h bukan dvh */
+        #app {
+            height: var(--app-h);
+        }
+
+        /* ✅ FIX 6: Semua animasi pakai translate3d — paksa GPU compositing layer
+           iOS WebKit hanya meng-composite elemen yang pakai translate3d/translateZ */
+        .fade-in {
+            animation: fadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate3d(0, 10px, 0); }
+            to   { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
+
+        /* ✅ FIX 7: test-track — GPU layer dengan backface-visibility
+           Tanpa ini, iOS Safari melakukan software rendering untuk translateY */
+        #test-track {
+            will-change: transform;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            -webkit-perspective: 1000px;
+            perspective: 1000px;
+            /* transition HANYA untuk transform, bukan 'all' */
+            transition: transform 0.36s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* ✅ FIX 8: test-viewport punya GPU layer sendiri
+           Mencegah iOS me-repaint track setiap frame */
+        #test-viewport {
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+
+        /* ✅ FIX 9: item-transition HANYA animasi transform + opacity
+           transition:all di iOS → recalculate semua property → sangat mahal */
+        .item-transition {
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            transition:
+                transform 0.34s cubic-bezier(0.25, 1, 0.5, 1),
+                opacity   0.34s cubic-bezier(0.25, 1, 0.5, 1),
+                font-size 0.34s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* ✅ FIX 10: Numpad button — touch-action + zero tap delay */
+        .numpad-btn {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            /* Hanya transition transform, bukan background (iOS scroll jank) */
+            transition: transform 0.08s ease;
+            cursor: pointer;
+        }
+        /* Active state via JS class agar instant, bukan :active pseudo */
+        .numpad-btn.pressed {
+            transform: scale3d(0.9, 0.9, 1);
+            background-color: #94a3b8 !important;
+        }
+
+        /* Timer pulse */
+        @keyframes timerPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.65; }
+        }
+        .timer-running { animation: timerPulse 2s ease-in-out infinite; }
+
+        /* Progress bar */
+        #progress-bar-fill {
+            transition: width 0.36s cubic-bezier(0.25, 1, 0.5, 1);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+
+        /* Scrollable areas — native feel on iOS */
+        .ios-scroll {
+            -webkit-overflow-scrolling: touch;
+            overflow-y: auto;
+        }
+
+        /* Focus highlight strip — gunakan opacity, bukan box-shadow agar compositable */
+        .focus-strip {
+            background: linear-gradient(
+                90deg,
+                rgba(59,130,246,0.03) 0%,
+                rgba(59,130,246,0.10) 50%,
+                rgba(59,130,246,0.03) 100%
+            );
+            /* GPU layer untuk elemen overlay ini */
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+        }
+
+        /* ✅ FIX 11: Input box — hapus box-shadow dari animated element
+           box-shadow pada element yang di-transform → iOS software render
+           Gantt: gunakan outline atau border saja */
+        .input-active {
+            border: 2px solid #3b82f6;
+            /* Opacity shadow, bukan blur — lebih ringan di iOS */
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+        }
+        .input-inactive {
+            border: 2px solid #e2e8f0;
+            box-shadow: none;
+        }
+        .input-done {
+            border: 2px solid transparent;
+            background-color: #f1f5f9;
+            box-shadow: none;
+        }
+
+        /* Minimal scrollbar */
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="w-full max-w-lg bg-white shadow-2xl md:rounded-3xl overflow-hidden flex flex-col">
+
+        <!-- HEADER -->
+        <header class="bg-slate-950 text-white px-5 py-3.5 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <h1 class="text-sm font-bold tracking-widest uppercase mono">CAT<span class="text-blue-400">psiko</span></h1>
+            </div>
+            <div id="user-display" class="hidden text-xs font-semibold bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full mono text-slate-300 truncate max-w-[140px]"></div>
+        </header>
+
+        <main class="flex-1 flex flex-col relative overflow-hidden">
+
+            <!-- ===== LOGIN ===== -->
+            <section id="login-section" class="fade-in w-full max-w-sm mx-auto flex flex-col justify-center h-full p-8">
+                <div class="mb-10">
+                    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-full mono mb-5">
+                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                        SISTEM EVALUASI AKTIF
+                    </div>
+                    <h2 class="text-3xl font-extrabold text-slate-900 leading-tight">Komputasi<br>Deret Angka</h2>
+                    <p class="text-slate-500 text-sm mt-2">Uji akurasi & kecepatan penjumlahan serial.</p>
+                </div>
+                <form id="login-form" class="space-y-3">
+                    <input type="text" id="student-name" required autocomplete="off"
+                        placeholder="Nama Lengkap Peserta"
+                        style="-webkit-user-select:text;user-select:text"
+                        class="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 focus:outline-none focus:border-blue-500 text-center font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal bg-slate-50">
+                    <button type="submit"
+                        class="w-full bg-slate-950 text-white font-bold py-3.5 px-4 rounded-2xl shadow-md text-sm tracking-wide">
+                        Masuk Sistem →
+                    </button>
+                </form>
+            </section>
+
+            <!-- ===== DASHBOARD ===== -->
+            <section id="dashboard-section" class="hidden fade-in flex-col h-full overflow-hidden bg-slate-50">
+                <div class="px-6 pt-6 pb-4 bg-white border-b border-slate-100 shrink-0">
+                    <h2 class="text-lg font-extrabold text-slate-900">Modul Simulasi</h2>
+                    <p class="text-slate-500 text-xs mt-0.5">20 Paket tersedia · Pilih untuk memulai</p>
+                    <div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="overall-progress-bar" class="h-full bg-blue-500 rounded-full" style="width:0%;transition:width 0.5s ease"></div>
+                    </div>
+                    <p id="overall-progress-text" class="text-xs text-slate-400 font-medium mono mt-1">0 / 20 selesai</p>
+                </div>
+                <!-- ios-scroll class untuk -webkit-overflow-scrolling: touch -->
+                <div id="package-list" class="flex-1 ios-scroll grid grid-cols-2 gap-3 p-4 pb-6 content-start"></div>
+            </section>
+
+            <!-- ===== TEST ===== -->
+            <section id="test-section" class="hidden fade-in flex-col h-full">
+
+                <!-- Top bar -->
+                <div class="flex items-center justify-between px-4 py-2.5 bg-slate-950 text-white shrink-0">
+                    <button id="btn-cancel-test"
+                        class="text-xs font-bold text-slate-400 px-2 py-1 rounded-lg"
+                        style="touch-action:manipulation;-webkit-tap-highlight-color:transparent">
+                        ✕ Batal
+                    </button>
+
+                    <!-- Count-up Timer -->
+                    <div class="flex items-center gap-2 bg-blue-600 px-4 py-1.5 rounded-full">
+                        <svg class="w-3 h-3 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span id="timer-display" class="mono text-sm font-extrabold text-white timer-running">00:00</span>
+                    </div>
+
+                    <span id="progress-text" class="mono text-xs font-bold text-slate-400 tabular-nums">0 / 99</span>
+                </div>
+
+                <!-- Progress bar strip -->
+                <div class="h-[3px] bg-slate-800 shrink-0">
+                    <div id="progress-bar-fill" class="h-full bg-blue-500" style="width:0%"></div>
+                </div>
+
+                <!-- Track + Numpad row -->
+                <div class="flex flex-row flex-1 overflow-hidden">
+
+                    <!-- ✅ Scrolling track dengan GPU layer -->
+                    <div id="test-viewport" class="flex-1 relative overflow-hidden flex flex-col justify-center bg-white">
+                        <div class="focus-strip absolute w-full h-[68px] border-y border-blue-200 pointer-events-none z-20 left-0 top-1/2 -translate-y-1/2"></div>
+                        <!-- ✅ FIX 12: py menggunakan style inline dengan --vp-half yang di-set JS
+                             py-[50vh] salah di iOS karena vh ≠ viewport sebenarnya -->
+                        <div id="test-track" class="absolute w-full left-0 top-0 flex flex-col items-center" style="padding-top:var(--vp-half,50%);padding-bottom:var(--vp-half,50%)"></div>
+                    </div>
+
+                    <!-- Numpad RIGHT -->
+                    <div class="w-[148px] sm:w-[164px] shrink-0 flex flex-col items-center justify-center bg-slate-950 border-l border-slate-800 py-5 px-3 gap-3">
+                        <div id="numpad-pkg-label" class="text-[10px] font-bold mono text-slate-500 tracking-widest uppercase text-center"></div>
+
+                        <div class="grid grid-cols-3 gap-2 w-full" id="numpad-grid">
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="1">1</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="2">2</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="3">3</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="4">4</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="5">5</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="6">6</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="7">7</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="8">8</button>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="9">9</button>
+                            <div></div>
+                            <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="0">0</button>
+                            <div></div>
+                        </div>
+
+                        <p class="text-[9px] text-slate-600 font-medium text-center mono">(a + b) mod 10</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== REVIEW ===== -->
+            <section id="review-section" class="hidden fade-in h-full flex flex-col bg-white">
+                <div class="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
+                    <p id="review-pkg-label" class="text-xs font-bold mono text-blue-600 uppercase tracking-widest mb-1"></p>
+                    <h2 class="text-xl font-extrabold text-slate-900">Laporan Evaluasi</h2>
+                </div>
+                <div id="review-stats" class="grid grid-cols-3 gap-3 px-5 py-4 shrink-0 bg-slate-50 border-b border-slate-100"></div>
+                <div class="flex-1 ios-scroll px-5 py-4" id="wrong-answers-container"></div>
+                <div class="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+                    <button id="btn-back-dashboard"
+                        style="touch-action:manipulation;-webkit-tap-highlight-color:transparent"
+                        class="flex-1 bg-slate-100 text-slate-700 font-bold py-3.5 rounded-2xl text-sm">
+                        ← Menu
+                    </button>
+                    <button id="btn-next-package"
+                        style="touch-action:manipulation;-webkit-tap-highlight-color:transparent"
+                        class="hidden flex-1 bg-slate-950 text-white font-bold py-3.5 rounded-2xl text-sm shadow-md">
+                        Lanjut →
+                    </button>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+    // ============================================================
+    //  ✅ iOS VIEWPORT HEIGHT FIX
+    //  window.innerHeight = tinggi sebenarnya (tanpa address bar)
+    //  Jalankan saat load & resize
+    // ============================================================
+    function setAppHeight() {
+        const h = window.innerHeight;
+        document.documentElement.style.setProperty('--app-h', h + 'px');
+        // --vp-half untuk centering py pada test-track
+        const viewport = document.getElementById('test-viewport');
+        if (viewport) {
+            const half = Math.round(viewport.clientHeight / 2);
+            document.documentElement.style.setProperty('--vp-half', half + 'px');
+        }
+    }
+    window.addEventListener('resize', setAppHeight);
+    setAppHeight();
+
+    // ============================================================
+    //  ✅ PREVENT BODY SCROLL di iOS
+    //  iOS Safari: scroll body bisa ter-trigger walau overflow:hidden
+    // ============================================================
+    document.addEventListener('touchmove', e => {
+        // Izinkan scroll hanya pada elemen dengan class ios-scroll
+        if (!e.target.closest('.ios-scroll')) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    // ============================================================
+    //  CONFIGURATION
+    // ============================================================
+    const TOTAL_PACKAGES      = 20;
+    const NUMBERS_PER_PACKAGE = 100;
+
+    // ============================================================
+    //  TIMER
+    // ============================================================
+    let timerInterval  = null;
+    let elapsedSeconds = 0;
+
+    function startTimer() {
+        elapsedSeconds = 0;
+        renderTimer();
+        timerInterval = setInterval(() => { elapsedSeconds++; renderTimer(); }, 1000);
+    }
+    function stopTimer() {
+        clearInterval(timerInterval);
+        timerInterval   = null;
+        state.sessionTime = elapsedSeconds;
+    }
+    function renderTimer() {
+        const m = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+        const s = (elapsedSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('timer-display').textContent = `${m}:${s}`;
+    }
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60), s = sec % 60;
+        return m > 0 ? `${m}m ${s.toString().padStart(2,'0')}s` : `${s}s`;
+    }
+
+    // ============================================================
+    //  STATE
+    // ============================================================
+    const state = {
+        studentName: '',
+        packages: [],
+        currentPackageIndex: null,
+        currentQuestionIndex: 0,
+        answers: [],
+        isTestActive: false,
+        sessionTime: 0
+    };
+
+    const views = {
+        login:     document.getElementById('login-section'),
+        dashboard: document.getElementById('dashboard-section'),
+        test:      document.getElementById('test-section'),
+        review:    document.getElementById('review-section')
+    };
+
+    function switchView(name) {
+        Object.values(views).forEach(el => {
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        });
+        views[name].classList.remove('hidden');
+        views[name].classList.add('flex');
+        // Recalculate vp-half after view switch
+        requestAnimationFrame(setAppHeight);
+    }
+
+    // ============================================================
+    //  DATA
+    // ============================================================
+    function generatePackages() {
+        return Array.from({ length: TOTAL_PACKAGES }, (_, i) => ({
+            id: i,
+            title: `Paket ${String(i + 1).padStart(2, '0')}`,
+            numbers: Array.from({ length: NUMBERS_PER_PACKAGE }, () => Math.floor(Math.random() * 9) + 1),
+            completed: false, score: null, time: null
+        }));
+    }
+
+    // ============================================================
+    //  LOGIN
+    // ============================================================
+    document.getElementById('login-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const name = document.getElementById('student-name').value.trim();
+        if (!name) return;
+        state.studentName = name;
+        document.getElementById('user-display').textContent = name;
+        document.getElementById('user-display').classList.remove('hidden');
+        state.packages = generatePackages();
+        renderDashboard();
+        switchView('dashboard');
+    });
+
+    // ============================================================
+    //  DASHBOARD
+    // ============================================================
+    function renderDashboard() {
+        const list      = document.getElementById('package-list');
+        const completed = state.packages.filter(p => p.completed).length;
+        document.getElementById('overall-progress-bar').style.width = `${(completed / TOTAL_PACKAGES) * 100}%`;
+        document.getElementById('overall-progress-text').textContent = `${completed} / ${TOTAL_PACKAGES} selesai`;
+
+        list.innerHTML = '';
+        state.packages.forEach((pkg, index) => {
+            const done = pkg.completed;
+            const btn  = document.createElement('button');
+            btn.style.cssText = 'touch-action:manipulation;-webkit-tap-highlight-color:transparent';
+            btn.className = [
+                'flex flex-col p-4 rounded-2xl border-2 text-left',
+                done ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-white'
+            ].join(' ');
+            btn.innerHTML = `
+                <div class="flex items-start justify-between w-full mb-2">
+                    <span class="mono text-[10px] font-bold tracking-widest text-slate-400 uppercase">${pkg.title}</span>
+                    <span class="w-5 h-5 flex items-center justify-center rounded-full ${done ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}">
+                        ${done
+                            ? `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`
+                            : `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`}
+                    </span>
+                </div>
+                <div class="text-xl font-extrabold text-slate-900">${done ? pkg.score + '%' : '—'}</div>
+                <div class="text-[11px] font-medium mt-0.5 ${done ? 'text-emerald-600' : 'text-slate-400'}">
+                    ${done ? formatTime(pkg.time) : '99 soal'}
+                </div>`;
+            btn.addEventListener('click', () => startTest(index));
+            list.appendChild(btn);
+        });
+    }
+
+    // ============================================================
+    //  TEST START
+    // ============================================================
+    function startTest(pkgIndex) {
+        state.currentPackageIndex  = pkgIndex;
+        state.currentQuestionIndex = 0;
+        state.answers              = [];
+        state.isTestActive         = true;
+        document.getElementById('numpad-pkg-label').textContent = state.packages[pkgIndex].title;
+        buildTestTrack();
+        switchView('test');
+        startTimer();
+        // Delay agar layout selesai, lalu recalculate vp-half + focus
+        setTimeout(() => {
+            setAppHeight();
+            updateFocus(0);
+        }, 80);
+    }
+
+    // ============================================================
+    //  BUILD TRACK
+    // ============================================================
+    function buildTestTrack() {
+        const pkg   = state.packages[state.currentPackageIndex];
+        const track = document.getElementById('test-track');
+        track.innerHTML = '';
+        // ✅ FIX: gunakan translate3d bukan translateY
+        track.style.transform = 'translate3d(0,0,0)';
+        const total = pkg.numbers.length - 1;
+        document.getElementById('progress-text').textContent = `0 / ${total}`;
+        document.getElementById('progress-bar-fill').style.width = '0%';
+
+        // Build dengan DocumentFragment — satu reflow, bukan N reflow
+        const frag = document.createDocumentFragment();
+        pkg.numbers.forEach((num, i) => {
+            const numDiv = document.createElement('div');
+            numDiv.id        = `num-${i}`;
+            numDiv.className = 'item-transition text-xl font-bold text-slate-400 w-full text-center py-2';
+            numDiv.style.opacity = '0.3';
+            numDiv.textContent   = num;
+            frag.appendChild(numDiv);
+
+            if (i < pkg.numbers.length - 1) {
+                const wrapper = document.createElement('div');
+                wrapper.id        = `wrapper-${i}`;
+                wrapper.className = 'item-transition w-full flex justify-center my-1';
+                wrapper.style.opacity = '0.3';
+
+                const box = document.createElement('div');
+                box.id        = `input-${i}`;
+                box.className = 'input-inactive flex items-center justify-center w-11 h-11 text-lg font-extrabold bg-white rounded-xl mono';
+                box.style.color = 'transparent';
+                box.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease, color 0.15s ease';
+
+                wrapper.appendChild(box);
+                frag.appendChild(wrapper);
+            }
+        });
+        track.appendChild(frag);
+    }
+
+    // ============================================================
+    //  ✅ FOCUS UPDATE — Batched DOM read/write via RAF
+    //  iOS sangat sensitif terhadap forced layout (baca offsetTop lalu
+    //  tulis style secara bergantian dalam loop = layout thrashing)
+    // ============================================================
+    function updateFocus(index) {
+        const pkg      = state.packages[state.currentPackageIndex];
+        const track    = document.getElementById('test-track');
+        const viewport = document.getElementById('test-viewport');
+        const target   = document.getElementById(`wrapper-${index}`);
+
+        if (!target) return;
+        state.currentQuestionIndex = index;
+
+        const total = pkg.numbers.length - 1;
+
+        // ── PHASE 1: DOM READ (sebelum any write) ──
+        const viewportH  = viewport.clientHeight;
+        const targetTop  = target.offsetTop;
+        const targetH    = target.clientHeight;
+
+        // ── PHASE 2: DOM WRITE dalam satu RAF batch ──
+        requestAnimationFrame(() => {
+            for (let i = 0; i < pkg.numbers.length; i++) {
+                const elNum     = document.getElementById(`num-${i}`);
+                const elWrapper = document.getElementById(`wrapper-${i}`);
+                const elInput   = document.getElementById(`input-${i}`);
+
+                if (i < index) {
+                    // Past
+                    if (elNum) {
+                        elNum.className = 'item-transition text-base font-bold text-slate-400 w-full text-center py-1.5';
+                        elNum.style.opacity = '0.1';
+                        elNum.style.transform = 'scale3d(0.9,0.9,1)';
+                    }
+                    if (elWrapper) {
+                        elWrapper.style.opacity = '0.1';
+                        elWrapper.style.transform = 'scale3d(0.9,0.9,1)';
+                    }
+                    if (elInput) {
+                        elInput.className = 'input-done flex items-center justify-center w-11 h-11 text-lg font-extrabold rounded-xl mono';
+                        elInput.style.color = '#94a3b8';
+                    }
+                } else if (i === index) {
+                    // Active
+                    if (elNum) {
+                        elNum.className = 'item-transition text-3xl font-extrabold text-slate-900 w-full text-center py-2';
+                        elNum.style.opacity = '1';
+                        elNum.style.transform = 'scale3d(1.1,1.1,1)';
+                    }
+                    const nextNum = document.getElementById(`num-${i + 1}`);
+                    if (nextNum) {
+                        nextNum.className = 'item-transition text-3xl font-extrabold text-slate-900 w-full text-center py-2';
+                        nextNum.style.opacity = '1';
+                        nextNum.style.transform = 'scale3d(1.1,1.1,1)';
+                    }
+                    if (elWrapper) {
+                        elWrapper.style.opacity = '1';
+                        elWrapper.style.transform = 'scale3d(1.1,1.1,1)';
+                    }
+                    if (elInput) {
+                        elInput.className = 'input-active flex items-center justify-center w-11 h-11 text-lg font-extrabold bg-white rounded-xl mono';
+                        elInput.style.color = 'transparent';
+                    }
+                } else if (i > index + 1) {
+                    // Future
+                    if (elNum) {
+                        elNum.className = 'item-transition text-xl font-bold text-slate-400 w-full text-center py-2';
+                        elNum.style.opacity = '0.25';
+                        elNum.style.transform = 'scale3d(1,1,1)';
+                    }
+                    if (elWrapper) {
+                        elWrapper.style.opacity = '0.25';
+                        elWrapper.style.transform = 'scale3d(1,1,1)';
+                    }
+                }
+            }
+
+            // ✅ FIX: translate3d(0, Y, 0) bukan translateY(Y)
+            const centerY  = viewportH / 2;
+            const elemMidY = targetTop + targetH / 2;
+            track.style.transform = `translate3d(0, ${Math.round(centerY - elemMidY)}px, 0)`;
+
+            // Progress
+            document.getElementById('progress-text').textContent = `${index} / ${total}`;
+            document.getElementById('progress-bar-fill').style.width = `${(index / total) * 100}%`;
+        });
+    }
+
+    // ============================================================
+    //  ✅ NUMPAD — touchstart (zero delay) + debounce
+    //  click di iOS = 300ms delay bahkan dengan touch-action:manipulation
+    //  pada beberapa versi iOS Safari
+    // ============================================================
+    let inputLocked = false; // debounce guard
+
+    function processInput(valStr) {
+        if (!state.isTestActive || inputLocked) return;
+        inputLocked = true;
+        setTimeout(() => { inputLocked = false; }, 80); // 80ms debounce
+
+        const userAns = parseInt(valStr, 10);
+        const idx     = state.currentQuestionIndex;
+        const pkg     = state.packages[state.currentPackageIndex];
+        const total   = pkg.numbers.length - 1;
+
+        const box = document.getElementById(`input-${idx}`);
+        if (box) {
+            box.textContent    = userAns;
+            box.style.color    = '#475569';
+            box.className      = 'input-done flex items-center justify-center w-11 h-11 text-lg font-extrabold rounded-xl mono';
+        }
+
+        const expected = (pkg.numbers[idx] + pkg.numbers[idx + 1]) % 10;
+        state.answers.push({
+            num1: pkg.numbers[idx], num2: pkg.numbers[idx + 1],
+            userAnswer: userAns, expectedAnswer: expected,
+            isCorrect: userAns === expected
+        });
+
+        const next = idx + 1;
+        if (next < total) {
+            updateFocus(next);
+        } else {
+            state.isTestActive = false;
+            stopTimer();
+            document.getElementById('progress-text').textContent = 'Memproses…';
+            document.getElementById('progress-bar-fill').style.width = '100%';
+            setTimeout(finishTest, 600);
+        }
+    }
+
+    // ✅ touchstart untuk response instant, click sebagai fallback desktop
+    document.querySelectorAll('.numpad-btn').forEach(btn => {
+        let touchFired = false;
+
+        btn.addEventListener('touchstart', e => {
+            e.preventDefault(); // cegah scroll & 300ms delay
+            touchFired = true;
+            // Visual press feedback instant
+            btn.classList.add('pressed');
+            processInput(btn.getAttribute('data-val'));
+        }, { passive: false });
+
+        btn.addEventListener('touchend', () => {
+            btn.classList.remove('pressed');
+            setTimeout(() => { touchFired = false; }, 300);
+        }, { passive: true });
+
+        // Desktop fallback
+        btn.addEventListener('click', e => {
+            if (touchFired) return; // sudah dihandle touchstart
+            processInput(btn.getAttribute('data-val'));
+        });
+    });
+
+    // Physical keyboard (desktop)
+    document.addEventListener('keydown', e => {
+        if (state.isTestActive && e.key >= '0' && e.key <= '9') processInput(e.key);
+    });
+
+    // Cancel
+    document.getElementById('btn-cancel-test').addEventListener('click', () => {
+        if (confirm('Akhiri sesi ini?')) {
+            state.isTestActive = false;
+            stopTimer();
+            renderDashboard();
+            switchView('dashboard');
+        }
+    });
+
+    // ============================================================
+    //  FINISH & REVIEW
+    // ============================================================
+    function finishTest() {
+        const correct = state.answers.filter(a => a.isCorrect).length;
+        const total   = state.answers.length;
+        const score   = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const pkg     = state.packages[state.currentPackageIndex];
+        pkg.completed = true;
+        pkg.score     = score;
+        pkg.time      = state.sessionTime;
+        renderReview();
+        switchView('review');
+    }
+
+    function renderReview() {
+        const pkg      = state.packages[state.currentPackageIndex];
+        const wrong    = state.answers.filter(a => !a.isCorrect);
+        const correct  = state.answers.length - wrong.length;
+        const accuracy = state.answers.length > 0 ? Math.round((correct / state.answers.length) * 100) : 0;
+        const nextIdx  = state.currentPackageIndex + 1;
+
+        document.getElementById('review-pkg-label').textContent =
+            `${pkg.title} · ${formatTime(state.sessionTime)}`;
+
+        const accColor = accuracy >= 80 ? 'text-emerald-600' : accuracy >= 60 ? 'text-amber-500' : 'text-red-500';
+        document.getElementById('review-stats').innerHTML = `
+            <div class="text-center">
+                <div class="text-2xl font-extrabold text-slate-900 mono">${state.answers.length}</div>
+                <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Total</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-extrabold mono ${accColor}">${accuracy}%</div>
+                <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Akurasi</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-extrabold text-blue-600 mono">${formatTime(state.sessionTime)}</div>
+                <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Waktu</div>
+            </div>`;
+
+        const container = document.getElementById('wrong-answers-container');
+        container.innerHTML = '';
+
+        if (wrong.length === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full py-10 text-center">
+                    <div class="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-extrabold text-slate-800">Sempurna!</h3>
+                    <p class="text-sm text-slate-400 mt-1">Seluruh komputasi valid — akurasi 100%.</p>
+                </div>`;
+        } else {
+            const frag = document.createDocumentFragment();
+            const header = document.createElement('p');
+            header.className = 'text-xs font-bold text-slate-400 uppercase tracking-widest mono mb-3';
+            header.textContent = `${wrong.length} Anomali Ditemukan`;
+            frag.appendChild(header);
+
+            wrong.forEach(ans => {
+                const item = document.createElement('div');
+                item.className = 'bg-red-50 border border-red-100 p-3.5 rounded-xl mb-2.5 flex items-center justify-between';
+                item.innerHTML = `
+                    <div class="flex items-center gap-5">
+                        <div class="mono text-center text-sm">
+                            <div class="text-slate-600 font-bold">${ans.num1}</div>
+                            <div class="text-slate-400 text-xs">+${ans.num2}</div>
+                            <div class="border-t border-slate-200 mt-1 pt-1 font-extrabold text-slate-700">${(ans.num1+ans.num2)%10}</div>
+                        </div>
+                        <div class="text-sm">
+                            <div class="text-slate-500">Kunci: <span class="font-extrabold text-emerald-600 mono">${ans.expectedAnswer}</span></div>
+                            <div class="text-slate-500">Input: <span class="font-extrabold text-red-500 mono">${ans.userAnswer}</span></div>
+                        </div>
+                    </div>
+                    <div class="w-7 h-7 bg-red-100 text-red-400 rounded-full flex items-center justify-center text-sm font-bold">✕</div>`;
+                frag.appendChild(item);
+            });
+            container.appendChild(frag);
+        }
+
+        const nextBtn = document.getElementById('btn-next-package');
+        if (nextIdx < TOTAL_PACKAGES) {
+            nextBtn.classList.remove('hidden');
+            nextBtn.textContent = `Lanjut ${state.packages[nextIdx].title} →`;
+            nextBtn.onclick = () => startTest(nextIdx);
+        } else {
+            nextBtn.classList.add('hidden');
+        }
+    }
+
+    document.getElementById('btn-back-dashboard').addEventListener('click', () => {
+        renderDashboard();
+        switchView('dashboard');
+    });
+    </script>
+</body>
+</html>
