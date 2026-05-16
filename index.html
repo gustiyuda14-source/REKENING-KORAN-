@@ -230,6 +230,37 @@
         backface-visibility: hidden;
     }
 
+    /* ─── TIER SYSTEM ───────────────────────────────────────── */
+    .tier-banner {
+        border-radius: 1rem;
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        animation: tierPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+        margin: 0 0 1rem 0;
+    }
+    @keyframes tierPop {
+        from { opacity:0; transform: scale(0.82); }
+        to   { opacity:1; transform: scale(1); }
+    }
+    .tier-rank {
+        font-size: 2.2rem;
+        font-weight: 900;
+        font-family: 'JetBrains Mono', monospace;
+        line-height: 1;
+        min-width: 2.5rem;
+        text-align: center;
+    }
+    .tier-badge-sm {
+        font-size: 9px;
+        font-weight: 800;
+        font-family: 'JetBrains Mono', monospace;
+        padding: 2px 5px;
+        border-radius: 5px;
+        letter-spacing: 0.05em;
+    }
+
     /* ─── SCROLLBAR ──────────────────────────────────────────── */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -650,10 +681,6 @@ function renderDashboard() {
     document.getElementById('stat-accuracy').textContent = avgAcc !== null ? avgAcc + '%' : '—';
     document.getElementById('stat-time').textContent     = completedPkgs.length ? formatTime(totalTime) : '—';
 
-    // Show sidebar on desktop
-    const sidebar = document.getElementById('dashboard-sidebar');
-    if (sidebar) sidebar.style.display = '';
-
     // Package grid
     list.innerHTML = '';
     const frag = document.createDocumentFragment();
@@ -674,8 +701,11 @@ function renderDashboard() {
                 </span>
             </div>
             <div class="text-xl font-extrabold text-slate-900">${done ? pkg.score+'%' : '—'}</div>
-            <div class="text-[11px] font-medium mt-0.5 ${done ? 'text-emerald-600' : 'text-slate-400'}">
-                ${done ? formatTime(pkg.time) : '99 soal'}
+            <div class="flex items-center justify-between mt-0.5">
+                <span class="text-[11px] font-medium ${done ? 'text-emerald-600' : 'text-slate-400'}">
+                    ${done ? formatTime(pkg.time) : '99 soal'}
+                </span>
+                ${done && pkg.tier ? `<span class="tier-badge-sm" style="background:${pkg.tier.bg};color:${pkg.tier.text}">${pkg.tier.emoji} ${pkg.tier.rank}</span>` : ''}
             </div>`;
         btn.addEventListener('click', () => startTest(index));
         frag.appendChild(btn);
@@ -869,13 +899,35 @@ document.getElementById('btn-cancel-test').addEventListener('click', () => {
     }
 });
 
+// ═══ TIER SYSTEM ═══
+function getTier(time, score) {
+    if (time <= 80  && score > 99.5) return { rank:'S+', label:'Manusia Setengah Dewa',   emoji:'🧬', bg:'#6d28d9', text:'#ede9fe' };
+    if (time <= 90  && score >= 90)  return { rank:'S',  label:'Manusia Super',            emoji:'⚡', bg:'#b45309', text:'#fef3c7' };
+    if (time <= 100 && score >= 85)  return { rank:'A',  label:'Manusia Turbo',            emoji:'🔥', bg:'#1d4ed8', text:'#dbeafe' };
+    if (time <= 130 && score >= 75)  return { rank:'B',  label:'Manusia Keren',            emoji:'💪', bg:'#047857', text:'#d1fae5' };
+    if (time <= 180 && score >= 60)  return { rank:'C',  label:'Manusia Kebanyakan Mikir', emoji:'🤔', bg:'#475569', text:'#f1f5f9' };
+    return                                  { rank:'D',  label:'Anak Kemarin Sore',        emoji:'🐌', bg:'#94a3b8', text:'#f8fafc' };
+}
+
+const tierDesc = {
+    'S+': 'Otakmu diisi GPU ya? Hampir mustahil ini.',
+    'S' : 'Kamu bukan manusia biasa. Mungkin.',
+    'A' : 'Jari-jarimu lebih cepat dari pikiranmu.',
+    'B' : 'Solid! Tinggal dikit lagi jadi legend.',
+    'C' : 'Santai ya... nggak apa-apa, latihan lagi!',
+    'D' : 'Baru lahir kemarin ya? Tenang, semua pernah mulai dari sini!'
+};
+
 // ═══ FINISH & REVIEW ═══
 function finishTest() {
     const correct = state.answers.filter(a => a.isCorrect).length;
     const total   = state.answers.length;
     const score   = total > 0 ? Math.round((correct/total)*100) : 0;
+    // Hitung akurasi presisi untuk tier S+ (>99.5%)
+    const accExact = total > 0 ? (correct / total) * 100 : 0;
     const pkg     = state.packages[state.currentPackageIndex];
     pkg.completed = true; pkg.score = score; pkg.time = state.sessionTime;
+    pkg.tier      = getTier(state.sessionTime, accExact);
     renderReview();
     switchView('review');
 }
@@ -886,9 +938,30 @@ function renderReview() {
     const correct = state.answers.length - wrong.length;
     const acc     = state.answers.length > 0 ? Math.round((correct/state.answers.length)*100) : 0;
     const nextIdx = state.currentPackageIndex + 1;
+    const tier    = pkg.tier;
 
     document.getElementById('review-pkg-label').textContent =
         `${pkg.title} · ${formatTime(state.sessionTime)}`;
+
+    // ── Tier banner ──
+    const reviewStatsPanel = document.getElementById('review-stats-panel');
+    let tierBanner = document.getElementById('tier-banner');
+    if (!tierBanner) {
+        tierBanner = document.createElement('div');
+        tierBanner.id = 'tier-banner';
+        reviewStatsPanel.insertBefore(tierBanner, reviewStatsPanel.firstChild);
+    }
+    tierBanner.className = 'tier-banner';
+    tierBanner.style.cssText = `background:${tier.bg};color:${tier.text};margin:1rem 1rem 0;`;
+    tierBanner.innerHTML = `
+        <div style="font-size:2.4rem;line-height:1">${tier.emoji}</div>
+        <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+                <span class="tier-rank" style="color:${tier.text};font-size:1.5rem">${tier.rank}</span>
+                <span style="font-size:0.75rem;font-weight:800;letter-spacing:0.08em;opacity:0.9;font-family:'JetBrains Mono',monospace">${tier.label.toUpperCase()}</span>
+            </div>
+            <p style="font-size:0.7rem;opacity:0.78;margin:0.2rem 0 0;font-weight:500">${tierDesc[tier.rank]}</p>
+        </div>`;
 
     const accColor = acc >= 80 ? 'text-emerald-600' : acc >= 60 ? 'text-amber-500' : 'text-red-500';
     document.getElementById('review-stats').innerHTML = `
