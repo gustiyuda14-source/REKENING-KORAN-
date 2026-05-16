@@ -216,6 +216,39 @@
         }
     }
 
+    /* ─── BARA API (ember particles) ───────────────────────── */
+    @keyframes emberRise {
+        0%   { transform: translate3d(0, 0, 0) scale(1);                     opacity: 0; }
+        8%   { opacity: 0.95; }
+        50%  { transform: translate3d(var(--dx), -50vh, 0) scale(0.8);       opacity: 0.7; }
+        92%  { opacity: 0.15; }
+        100% { transform: translate3d(calc(var(--dx)*1.4), -100vh, 0) scale(0.4); opacity: 0; }
+    }
+    .ember {
+        position: absolute;
+        bottom: -8px;
+        border-radius: 50%;
+        pointer-events: none;
+        animation: emberRise var(--dur) ease-in both;
+        will-change: transform, opacity;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+
+    /* ─── TICKER MOTIVASI ──────────────────────────────────── */
+    @keyframes tick {
+        from { transform: translateX(100vw); }
+        to   { transform: translateX(-100%); }
+    }
+    @keyframes heartbeat {
+        0%,100% { transform: scale(1); }
+        14%     { transform: scale(1.3); }
+        28%     { transform: scale(1); }
+        42%     { transform: scale(1.2); }
+        56%     { transform: scale(1); }
+    }
+    .hb { display:inline-block; animation: heartbeat 1.2s ease-in-out infinite; }
+
     /* ─── SHAKE (jawaban salah) ─────────────────────────────── */
     @keyframes shake {
         0%, 100% { transform: translate3d(0, 0, 0); }
@@ -514,6 +547,13 @@
                 <div id="progress-bar-fill" class="h-full bg-blue-500" style="width:0%"></div>
             </div>
 
+            <!-- Ticker motivasi -->
+            <div id="ticker-wrap" style="display:none;overflow:hidden;white-space:nowrap;background:linear-gradient(90deg,#7c3aed,#dc2626,#ea580c);padding:5px 0;pointer-events:none;flex-shrink:0;">
+                <span id="ticker-inner" style="display:inline-block;animation:tick 22s linear infinite;font-size:13px;font-weight:800;letter-spacing:.05em;color:#fff;">
+                    <span class="hb">❤️</span>&nbsp; AYO SEMANGAT! &nbsp;·&nbsp; TETAP FOKUS! &nbsp;·&nbsp; KAMU BISA! &nbsp;·&nbsp; JANGAN MENYERAH! &nbsp;·&nbsp; SATU LAGI! &nbsp;·&nbsp; FOKUS FOKUS FOKUS! &nbsp;·&nbsp; PERCAYA DIRIMU! &nbsp;·&nbsp; HABISKAN SEMUA! &nbsp;·&nbsp; GASPOL! &nbsp;·&nbsp; <span class="hb">❤️</span>&nbsp; AYO SEMANGAT! &nbsp;·&nbsp; TETAP FOKUS! &nbsp;·&nbsp; KAMU BISA! &nbsp;·&nbsp; JANGAN MENYERAH! &nbsp;·&nbsp;
+                </span>
+            </div>
+
             <!-- Track + Numpad -->
             <div class="flex flex-col flex-1 overflow-hidden">
 
@@ -522,6 +562,7 @@
                      style="-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden">
                     <div class="focus-strip"></div>
                     <div id="test-track"></div>
+                    <div id="ember-container" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:15"></div>
                 </div>
 
                 <!-- Numpad BOTTOM -->
@@ -776,6 +817,35 @@ function renderDashboard() {
 }
 
 // ═══ TEST START ═══
+// ─── TICKER ───────────────────────────────────────────────
+function showTicker() { const t=document.getElementById('ticker-wrap'); if(t) t.style.display=''; }
+function hideTicker()  { const t=document.getElementById('ticker-wrap'); if(t) t.style.display='none'; }
+
+// ─── EMBER PARTICLES ──────────────────────────────────────
+let emberInterval = null;
+function spawnEmber() {
+    const c = document.getElementById('ember-container');
+    if (!c) return;
+    const el = document.createElement('div');
+    el.className = 'ember';
+    const size = 4+Math.random()*7, left = 5+Math.random()*90,
+          dur  = 3+Math.random()*4, dx   = (Math.random()-.5)*60,
+          hue  = 15+Math.random()*25;
+    el.style.cssText = `width:${size}px;height:${size}px;left:${left}%;background:radial-gradient(circle,hsl(${hue},100%,70%),hsl(${hue},100%,40%));box-shadow:0 0 ${size}px hsl(${hue},100%,60%);--dur:${dur}s;--dx:${dx}px;`;
+    c.appendChild(el);
+    setTimeout(()=>el.remove(), dur*1000+100);
+}
+function startEmbers() {
+    stopEmbers();
+    emberInterval = setInterval(spawnEmber, 400);
+    for(let i=0;i<4;i++) setTimeout(spawnEmber,i*100);
+}
+function stopEmbers() {
+    clearInterval(emberInterval); emberInterval=null;
+    const c=document.getElementById('ember-container');
+    if(c) c.innerHTML='';
+}
+
 function startTest(pkgIndex) {
     state.currentPackageIndex  = pkgIndex;
     state.currentQuestionIndex = 0;
@@ -794,6 +864,8 @@ function startTest(pkgIndex) {
 
     buildTestTrack();
     switchView('test');
+    startEmbers();
+    showTicker();
     startTimer();
 
     setTimeout(() => {
@@ -998,6 +1070,8 @@ document.getElementById('btn-cancel-test').addEventListener('click', () => {
     if (confirm('Akhiri sesi ini?')) {
         state.isTestActive = false;
         stopTimer();
+        stopEmbers();
+        hideTicker();
         renderDashboard();
         switchView('dashboard');
     }
@@ -1032,6 +1106,8 @@ function finishTest() {
     const pkg     = state.packages[state.currentPackageIndex];
     pkg.completed = true; pkg.score = score; pkg.time = state.sessionTime;
     pkg.tier      = getTier(state.sessionTime, accExact);
+    stopEmbers();
+    hideTicker();
     renderReview();
     switchView('review');
 }
