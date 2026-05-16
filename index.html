@@ -21,16 +21,20 @@
     }
     input { -webkit-user-select: text !important; user-select: text !important; }
 
-    html, body {
+    html {
         height: 100%;
+        overflow: hidden;
+    }
+    body {
+        /* height di-set tepat oleh JS setAppHeight() */
+        width: 100%;
         overflow: hidden;
         overscroll-behavior: none;
         touch-action: none;
         margin: 0; padding: 0;
-        background: #e2e8f0;
+        background: #f1f5f9;
         display: flex;
-        align-items: center;
-        justify-content: center;
+        flex-direction: column;
         font-family: 'Plus Jakarta Sans', sans-serif;
     }
 
@@ -38,7 +42,8 @@
 
     /* ─── APP SHELL ─────────────────────────────────────────── */
     #app {
-        height: var(--app-h);
+        flex: 1;
+        min-height: 0;
         width: 100%;
         background: white;
         display: flex;
@@ -48,24 +53,13 @@
         transform: translateZ(0);
     }
 
-    /* Mobile: full screen */
-    @media (max-width: 767px) {
-        html, body { align-items: stretch; }
-        #app { height: var(--app-h); }
+    /* Sidebar: hidden by default, tampil hanya di desktop */
+    #dashboard-sidebar {
+        display: none;
     }
-
-    /* Tablet & Desktop: full screen, no card */
-    @media (min-width: 768px) {
-        html, body {
-            background: #f1f5f9;
-            align-items: stretch;
-            justify-content: stretch;
-        }
-        #app {
-            max-width: none;
-            height: var(--app-h);
-            border-radius: 0;
-            box-shadow: none;
+    @media (min-width: 1024px) {
+        #dashboard-sidebar {
+            display: flex;
         }
     }
 
@@ -247,9 +241,6 @@
         #dashboard-section {
             flex-direction: row !important;
         }
-        #dashboard-sidebar {
-            display: flex;
-        }
         #dashboard-main {
             flex: 1;
             overflow: hidden;
@@ -358,7 +349,7 @@
         <section id="dashboard-section" class="hidden fade-in h-full overflow-hidden bg-slate-50">
 
             <!-- Desktop sidebar -->
-            <div id="dashboard-sidebar" class="hidden w-64 xl:w-72 shrink-0 bg-white border-r border-slate-100 flex-col p-6 gap-6">
+            <div id="dashboard-sidebar" class="w-64 xl:w-72 shrink-0 bg-white border-r border-slate-100 flex-col p-6 gap-6">
                 <div>
                     <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mono mb-3">Progress Keseluruhan</h2>
                     <div id="sidebar-progress-ring" class="flex items-center gap-4">
@@ -523,6 +514,8 @@
 // ═══ iOS / DESKTOP VIEWPORT FIX ═══
 function setAppHeight() {
     const h = window.innerHeight;
+    // Set body height via JS — CSS 100% ≠ window.innerHeight pada iOS Safari
+    document.body.style.height = h + 'px';
     document.documentElement.style.setProperty('--app-h', h + 'px');
     const vp = document.getElementById('test-viewport');
     if (vp) {
