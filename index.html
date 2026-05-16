@@ -216,6 +216,21 @@
         }
     }
 
+    /* ─── SHAKE (jawaban salah) ─────────────────────────────── */
+    @keyframes shake {
+        0%, 100% { transform: translate3d(0, 0, 0); }
+        20%       { transform: translate3d(-6px, 0, 0); }
+        40%       { transform: translate3d(6px, 0, 0); }
+        60%       { transform: translate3d(-4px, 0, 0); }
+        80%       { transform: translate3d(4px, 0, 0); }
+    }
+    .shake {
+        animation: shake 0.35s cubic-bezier(0.36,0.07,0.19,0.97) both;
+        border-color: #ef4444 !important;
+        background: #fef2f2 !important;
+        color: #ef4444 !important;
+    }
+
     /* ─── TIMER PULSE ────────────────────────────────────────── */
     @keyframes timerPulse {
         0%,100% { opacity:1; }
@@ -515,7 +530,7 @@
                         <div id="numpad-pkg-label" class="text-[10px] font-bold mono text-slate-500 tracking-widest uppercase"></div>
                         <p id="formula-label" class="text-[9px] text-slate-600 font-medium mono">(a + b) mod 10</p>
                     </div>
-                    <div class="grid grid-cols-5 gap-2 w-full">
+                    <div class="grid grid-cols-3 gap-2 w-full">
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="1">1</button>
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="2">2</button>
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="3">3</button>
@@ -525,7 +540,9 @@
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="7">7</button>
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="8">8</button>
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="9">9</button>
+                        <div></div>
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="0">0</button>
+                        <div></div>
                     </div>
                 </div>
             </div>
@@ -896,10 +913,22 @@ function processInput(valStr) {
     const expected = state.mode === 'add'
         ? (pkg.numbers[idx] + pkg.numbers[idx+1]) % 10
         : (pkg.numbers[idx] * pkg.numbers[idx+1]) % 10;
+    const isCorrect = userAns === expected;
+
+    // Efek getar saat jawaban salah
+    if (!isCorrect) {
+        if (navigator.vibrate) navigator.vibrate([80, 30, 80]);
+        const wrongBox = document.getElementById(`b${idx}`);
+        if (wrongBox) {
+            wrongBox.classList.add('shake');
+            setTimeout(() => wrongBox.classList.remove('shake'), 400);
+        }
+    }
+
     state.answers.push({
         num1: pkg.numbers[idx], num2: pkg.numbers[idx+1],
         userAnswer: userAns, expectedAnswer: expected,
-        isCorrect: userAns === expected
+        isCorrect
     });
 
     const next = idx + 1;
