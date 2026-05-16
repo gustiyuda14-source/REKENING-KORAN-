@@ -230,6 +230,65 @@
         backface-visibility: hidden;
     }
 
+    /* ─── TIER SYSTEM ───────────────────────────────────────── */
+    .tier-banner {
+        border-radius: 1rem;
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        animation: tierPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+        margin: 0 0 1rem 0;
+    }
+    @keyframes tierPop {
+        from { opacity:0; transform: scale(0.82); }
+        to   { opacity:1; transform: scale(1); }
+    }
+    .tier-rank {
+        font-size: 2.2rem;
+        font-weight: 900;
+        font-family: 'JetBrains Mono', monospace;
+        line-height: 1;
+        min-width: 2.5rem;
+        text-align: center;
+    }
+    .tier-badge-sm {
+        font-size: 9px;
+        font-weight: 800;
+        font-family: 'JetBrains Mono', monospace;
+        padding: 2px 5px;
+        border-radius: 5px;
+        letter-spacing: 0.05em;
+    }
+
+    /* ─── MODE TOGGLE ───────────────────────────────────────── */
+    .mode-btn {
+        flex: 1;
+        padding: 0.4rem 0.6rem;
+        border-radius: 0.6rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+        border: none;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        color: #94a3b8;
+        background: transparent;
+        white-space: nowrap;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .mode-btn.active-add {
+        background: white;
+        color: #1d4ed8;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    .mode-btn.active-mul {
+        background: white;
+        color: #c2410c;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+
     /* ─── SCROLLBAR ──────────────────────────────────────────── */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -396,13 +455,20 @@
             <!-- Main content -->
             <div id="dashboard-main" class="flex-1 overflow-hidden flex flex-col min-w-0">
                 <div class="px-5 lg:px-8 pt-5 pb-4 bg-white border-b border-slate-100 shrink-0">
-                    <div class="flex items-center justify-between">
-                        <div>
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="min-w-0">
                             <h2 class="text-base lg:text-lg font-extrabold text-slate-900">Modul Simulasi</h2>
-                            <p class="text-slate-500 text-xs mt-0.5">20 Paket tersedia · Pilih untuk memulai</p>
+                            <p id="dashboard-subtitle" class="text-slate-500 text-xs mt-0.5">Mode Penjumlahan · 20 Paket</p>
                         </div>
-                        <div id="mobile-progress-badge" class="lg:hidden flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full">
-                            <span id="mobile-done-count" class="text-xs font-bold mono text-blue-700">0/20</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <!-- Mode Toggle -->
+                            <div id="mode-toggle" class="flex bg-slate-100 rounded-xl p-1 gap-1">
+                                <button id="btn-mode-add" class="mode-btn active-add">➕ Tambah</button>
+                                <button id="btn-mode-mul" class="mode-btn">✖ Kali</button>
+                            </div>
+                            <div id="mobile-progress-badge" class="lg:hidden flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full">
+                                <span id="mobile-done-count" class="text-xs font-bold mono text-blue-700">0/20</span>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -469,7 +535,7 @@
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="0">0</button>
                         <div></div>
                     </div>
-                    <p class="text-[9px] text-slate-600 font-medium text-center mono">(a + b) mod 10</p>
+                    <p id="formula-label" class="text-[9px] text-slate-600 font-medium text-center mono">(a + b) mod 10</p>
                 </div>
             </div>
         </section>
@@ -561,13 +627,20 @@ function formatTime(sec) {
 // ═══ STATE ═══
 const state = {
     studentName: '',
-    packages: [],
+    mode: 'add',         // 'add' | 'mul'
+    packagesAdd: [],
+    packagesMul: [],
+    packages: [],        // alias aktif → packagesAdd atau packagesMul
     currentPackageIndex: null,
     currentQuestionIndex: 0,
     answers: [],
     isTestActive: false,
     sessionTime: 0
 };
+
+function activePkgs() {
+    return state.mode === 'add' ? state.packagesAdd : state.packagesMul;
+}
 
 let prevFocusIndex = -1;
 
@@ -589,12 +662,12 @@ function switchView(name) {
 }
 
 // ═══ DATA ═══
-function generatePackages() {
+function generatePackages(mode = 'add') {
     return Array.from({ length: TOTAL_PACKAGES }, (_, i) => ({
-        id: i,
+        id: i, mode,
         title: `Paket ${String(i+1).padStart(2,'0')}`,
         numbers: Array.from({ length: NUMBERS_PER_PACKAGE }, () => Math.floor(Math.random() * 9) + 1),
-        completed: false, score: null, time: null
+        completed: false, score: null, time: null, tier: null
     }));
 }
 
@@ -608,13 +681,18 @@ document.getElementById('login-form').addEventListener('submit', e => {
     udEl.querySelector('span').textContent = name;
     udEl.classList.remove('hidden');
     udEl.classList.add('flex');
-    state.packages = generatePackages();
+    state.packagesAdd = generatePackages('add');
+    state.packagesMul = generatePackages('mul');
+    state.mode        = 'add';
+    state.packages    = state.packagesAdd;
     renderDashboard();
     switchView('dashboard');
 });
 
 // ═══ DASHBOARD ═══
 function renderDashboard() {
+    // Sync packages ke mode aktif
+    state.packages = activePkgs();
     const list      = document.getElementById('package-list');
     const completed = state.packages.filter(p => p.completed).length;
     const pct       = Math.round((completed / TOTAL_PACKAGES) * 100);
@@ -650,9 +728,12 @@ function renderDashboard() {
     document.getElementById('stat-accuracy').textContent = avgAcc !== null ? avgAcc + '%' : '—';
     document.getElementById('stat-time').textContent     = completedPkgs.length ? formatTime(totalTime) : '—';
 
-    // Show sidebar on desktop
-    const sidebar = document.getElementById('dashboard-sidebar');
-    if (sidebar) sidebar.style.display = '';
+    // Subtitle & toggle aktif
+    const isAdd = state.mode === 'add';
+    const subtitle = document.getElementById('dashboard-subtitle');
+    if (subtitle) subtitle.textContent = isAdd ? 'Mode Penjumlahan · 20 Paket' : 'Mode Perkalian · 20 Paket';
+    document.getElementById('btn-mode-add').className = `mode-btn ${isAdd ? 'active-add' : ''}`;
+    document.getElementById('btn-mode-mul').className = `mode-btn ${!isAdd ? 'active-mul' : ''}`;
 
     // Package grid
     list.innerHTML = '';
@@ -674,8 +755,11 @@ function renderDashboard() {
                 </span>
             </div>
             <div class="text-xl font-extrabold text-slate-900">${done ? pkg.score+'%' : '—'}</div>
-            <div class="text-[11px] font-medium mt-0.5 ${done ? 'text-emerald-600' : 'text-slate-400'}">
-                ${done ? formatTime(pkg.time) : '99 soal'}
+            <div class="flex items-center justify-between mt-0.5">
+                <span class="text-[11px] font-medium ${done ? 'text-emerald-600' : 'text-slate-400'}">
+                    ${done ? formatTime(pkg.time) : '99 soal'}
+                </span>
+                ${done && pkg.tier ? `<span class="tier-badge-sm" style="background:${pkg.tier.bg};color:${pkg.tier.text}">${pkg.tier.emoji} ${pkg.tier.rank}</span>` : ''}
             </div>`;
         btn.addEventListener('click', () => startTest(index));
         frag.appendChild(btn);
@@ -695,6 +779,10 @@ function startTest(pkgIndex) {
     document.getElementById('numpad-pkg-label').textContent = label;
     const badge = document.getElementById('test-pkg-badge');
     if (badge) badge.textContent = label;
+    // Update formula label & mode indicator
+    const isAdd = state.mode === 'add';
+    const fl = document.getElementById('formula-label');
+    if (fl) fl.textContent = isAdd ? '(a + b) mod 10' : '(a × b) mod 10';
 
     buildTestTrack();
     switchView('test');
@@ -814,7 +902,9 @@ function processInput(valStr) {
         box.dataset.state = 'done';
     }
 
-    const expected = (pkg.numbers[idx] + pkg.numbers[idx+1]) % 10;
+    const expected = state.mode === 'add'
+        ? (pkg.numbers[idx] + pkg.numbers[idx+1]) % 10
+        : (pkg.numbers[idx] * pkg.numbers[idx+1]) % 10;
     state.answers.push({
         num1: pkg.numbers[idx], num2: pkg.numbers[idx+1],
         userAnswer: userAns, expectedAnswer: expected,
@@ -869,13 +959,35 @@ document.getElementById('btn-cancel-test').addEventListener('click', () => {
     }
 });
 
+// ═══ TIER SYSTEM ═══
+function getTier(time, score) {
+    if (time <= 80  && score > 99.5) return { rank:'S+', label:'Manusia Setengah Dewa',   emoji:'🧬', bg:'#6d28d9', text:'#ede9fe' };
+    if (time <= 90  && score >= 90)  return { rank:'S',  label:'Manusia Super',            emoji:'⚡', bg:'#b45309', text:'#fef3c7' };
+    if (time <= 100 && score >= 85)  return { rank:'A',  label:'Manusia Turbo',            emoji:'🔥', bg:'#1d4ed8', text:'#dbeafe' };
+    if (time <= 130 && score >= 75)  return { rank:'B',  label:'Manusia Keren',            emoji:'💪', bg:'#047857', text:'#d1fae5' };
+    if (time <= 180 && score >= 60)  return { rank:'C',  label:'Manusia Kebanyakan Mikir', emoji:'🤔', bg:'#475569', text:'#f1f5f9' };
+    return                                  { rank:'D',  label:'Anak Kemarin Sore',        emoji:'🐌', bg:'#94a3b8', text:'#f8fafc' };
+}
+
+const tierDesc = {
+    'S+': 'Otakmu diisi GPU ya? Hampir mustahil ini.',
+    'S' : 'Kamu bukan manusia biasa. Mungkin.',
+    'A' : 'Jari-jarimu lebih cepat dari pikiranmu.',
+    'B' : 'Solid! Tinggal dikit lagi jadi legend.',
+    'C' : 'Santai ya... nggak apa-apa, latihan lagi!',
+    'D' : 'Baru lahir kemarin ya? Tenang, semua pernah mulai dari sini!'
+};
+
 // ═══ FINISH & REVIEW ═══
 function finishTest() {
     const correct = state.answers.filter(a => a.isCorrect).length;
     const total   = state.answers.length;
     const score   = total > 0 ? Math.round((correct/total)*100) : 0;
+    // Hitung akurasi presisi untuk tier S+ (>99.5%)
+    const accExact = total > 0 ? (correct / total) * 100 : 0;
     const pkg     = state.packages[state.currentPackageIndex];
     pkg.completed = true; pkg.score = score; pkg.time = state.sessionTime;
+    pkg.tier      = getTier(state.sessionTime, accExact);
     renderReview();
     switchView('review');
 }
@@ -886,9 +998,30 @@ function renderReview() {
     const correct = state.answers.length - wrong.length;
     const acc     = state.answers.length > 0 ? Math.round((correct/state.answers.length)*100) : 0;
     const nextIdx = state.currentPackageIndex + 1;
+    const tier    = pkg.tier;
 
     document.getElementById('review-pkg-label').textContent =
         `${pkg.title} · ${formatTime(state.sessionTime)}`;
+
+    // ── Tier banner ──
+    const reviewStatsPanel = document.getElementById('review-stats-panel');
+    let tierBanner = document.getElementById('tier-banner');
+    if (!tierBanner) {
+        tierBanner = document.createElement('div');
+        tierBanner.id = 'tier-banner';
+        reviewStatsPanel.insertBefore(tierBanner, reviewStatsPanel.firstChild);
+    }
+    tierBanner.className = 'tier-banner';
+    tierBanner.style.cssText = `background:${tier.bg};color:${tier.text};margin:1rem 1rem 0;`;
+    tierBanner.innerHTML = `
+        <div style="font-size:2.4rem;line-height:1">${tier.emoji}</div>
+        <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+                <span class="tier-rank" style="color:${tier.text};font-size:1.5rem">${tier.rank}</span>
+                <span style="font-size:0.75rem;font-weight:800;letter-spacing:0.08em;opacity:0.9;font-family:'JetBrains Mono',monospace">${tier.label.toUpperCase()}</span>
+            </div>
+            <p style="font-size:0.7rem;opacity:0.78;margin:0.2rem 0 0;font-weight:500">${tierDesc[tier.rank]}</p>
+        </div>`;
 
     const accColor = acc >= 80 ? 'text-emerald-600' : acc >= 60 ? 'text-amber-500' : 'text-red-500';
     document.getElementById('review-stats').innerHTML = `
@@ -934,8 +1067,8 @@ function renderReview() {
                 <div class="flex items-center gap-5">
                     <div class="mono text-center text-sm">
                         <div class="text-slate-600 font-bold">${ans.num1}</div>
-                        <div class="text-slate-400 text-xs">+${ans.num2}</div>
-                        <div class="border-t border-slate-200 mt-1 pt-1 font-extrabold text-slate-700">${(ans.num1+ans.num2)%10}</div>
+                        <div class="text-slate-400 text-xs">${state.mode === 'add' ? '+' : '×'}${ans.num2}</div>
+                        <div class="border-t border-slate-200 mt-1 pt-1 font-extrabold text-slate-700">${ans.expectedAnswer}</div>
                     </div>
                     <div class="text-sm">
                         <div class="text-slate-500">Kunci: <span class="font-extrabold text-emerald-600 mono">${ans.expectedAnswer}</span></div>
@@ -961,6 +1094,20 @@ function renderReview() {
 document.getElementById('btn-back-dashboard').addEventListener('click', () => {
     renderDashboard();
     switchView('dashboard');
+});
+
+// ═══ MODE TOGGLE ═══
+document.getElementById('btn-mode-add').addEventListener('click', () => {
+    if (state.mode === 'add') return;
+    state.mode     = 'add';
+    state.packages = state.packagesAdd;
+    renderDashboard();
+});
+document.getElementById('btn-mode-mul').addEventListener('click', () => {
+    if (state.mode === 'mul') return;
+    state.mode     = 'mul';
+    state.packages = state.packagesMul;
+    renderDashboard();
 });
 </script>
 </body>
