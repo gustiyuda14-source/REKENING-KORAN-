@@ -307,10 +307,6 @@
             flex-direction: column;
         }
 
-        /* Test: wider numpad */
-        #numpad-panel {
-            width: 220px !important;
-        }
 
         /* Review: 2-column */
         #review-body {
@@ -323,11 +319,6 @@
         }
         #review-answers-panel {
             flex: 1;
-        }
-    }
-    @media (min-width: 1280px) {
-        #numpad-panel {
-            width: 260px !important;
         }
     }
 
@@ -509,7 +500,7 @@
             </div>
 
             <!-- Track + Numpad -->
-            <div class="flex flex-row flex-1 overflow-hidden">
+            <div class="flex flex-col flex-1 overflow-hidden">
 
                 <!-- Scrolling track -->
                 <div id="test-viewport" class="flex-1 relative overflow-hidden bg-white"
@@ -518,24 +509,24 @@
                     <div id="test-track"></div>
                 </div>
 
-                <!-- Numpad RIGHT -->
-                <div id="numpad-panel" class="w-[148px] sm:w-[172px] shrink-0 flex flex-col items-center justify-center bg-slate-950 border-l border-slate-800 py-5 px-3 gap-3">
-                    <div id="numpad-pkg-label" class="text-[10px] font-bold mono text-slate-500 tracking-widest uppercase text-center"></div>
-                    <div class="grid grid-cols-3 gap-2 w-full">
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="1">1</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="2">2</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="3">3</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="4">4</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="5">5</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="6">6</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="7">7</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="8">8</button>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="9">9</button>
-                        <div></div>
-                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="0">0</button>
-                        <div></div>
+                <!-- Numpad BOTTOM -->
+                <div id="numpad-panel" class="shrink-0 bg-slate-950 border-t border-slate-800 px-4 py-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <div id="numpad-pkg-label" class="text-[10px] font-bold mono text-slate-500 tracking-widest uppercase"></div>
+                        <p id="formula-label" class="text-[9px] text-slate-600 font-medium mono">(a + b) mod 10</p>
                     </div>
-                    <p id="formula-label" class="text-[9px] text-slate-600 font-medium text-center mono">(a + b) mod 10</p>
+                    <div class="grid grid-cols-5 gap-2 w-full">
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="1">1</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="2">2</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="3">3</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="4">4</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="5">5</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="6">6</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="7">7</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="8">8</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="9">9</button>
+                        <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-3 rounded-xl border border-slate-700" data-val="0">0</button>
+                    </div>
                 </div>
             </div>
         </section>
