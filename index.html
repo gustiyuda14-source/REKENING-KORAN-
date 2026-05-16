@@ -38,20 +38,47 @@
 
     /* ─── APP SHELL ─────────────────────────────────────────── */
     #app {
-        /* ✅ window.innerHeight via JS, bukan dvh/vh */
         height: var(--app-h);
         width: 100%;
-        max-width: 28rem;
         background: white;
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        /* GPU layer untuk seluruh app */
         -webkit-transform: translateZ(0);
         transform: translateZ(0);
     }
-    @media (min-width: 768px) {
-        #app { border-radius: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+
+    /* Mobile: full screen tanpa radius */
+    @media (max-width: 767px) {
+        html, body { align-items: stretch; }
+        #app { height: var(--app-h); }
+    }
+
+    /* Tablet: card dengan shadow */
+    @media (min-width: 768px) and (max-width: 1023px) {
+        html, body { background: #e2e8f0; }
+        #app {
+            max-width: 680px;
+            height: calc(var(--app-h) - 48px);
+            border-radius: 1.5rem;
+            box-shadow: 0 32px 64px -12px rgba(0,0,0,0.28);
+        }
+    }
+
+    /* Desktop: full-width web app */
+    @media (min-width: 1024px) {
+        html, body {
+            background: #f1f5f9;
+            align-items: stretch;
+            justify-content: stretch;
+        }
+        #app {
+            max-width: none;
+            height: 100vh;
+            height: var(--app-h);
+            border-radius: 0;
+            box-shadow: none;
+        }
     }
 
     /* ─── FADE IN ───────────────────────────────────────────── */
@@ -67,18 +94,7 @@
         overflow-y: auto;
     }
 
-    /* ═══════════════════════════════════════════════════════════
-       TRACK SYSTEM — Core iOS perf fix
-       
-       Prinsip:
-       1. Satu font-size fixed — TIDAK ADA font-size transition (layout property, mahal di iOS)
-       2. Semua visual change via transform + opacity SAJA (compositor-only, GPU thread)
-       3. CSS dikendalikan oleh data-state attribute — JS hanya set 1 attribute, bukan className string
-       4. contain: style → isolasi style recalculation per-elemen
-       5. will-change HANYA di test-track container, bukan di tiap item
-    ═══════════════════════════════════════════════════════════ */
-
-    /* ── test-track: satu-satunya element dengan will-change ── */
+    /* ─── TRACK SYSTEM ──────────────────────────────────────── */
     #test-track {
         position: absolute;
         width: 100%;
@@ -88,46 +104,35 @@
         align-items: center;
         padding-top: var(--vp-half);
         padding-bottom: var(--vp-half);
-
         will-change: transform;
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
-        /* translate3d saja, tidak perlu perspective di sini */
         transform: translate3d(0, 0, 0);
         transition: transform 0.34s cubic-bezier(0.25, 1, 0.5, 1);
     }
 
-    /* ── track-num: angka-angka ──────────────────────────────── */
     .track-num {
         width: 100%;
         text-align: center;
         padding: 0.45rem 0;
-        font-size: 1.5rem;       /* FIXED — tidak berubah */
+        font-size: 1.5rem;
         font-weight: 700;
         font-family: 'JetBrains Mono', monospace;
         color: #94a3b8;
-
-        /* ✅ HANYA transform + opacity — keduanya compositor-only */
         transition:
             transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
             opacity   0.3s cubic-bezier(0.25, 1, 0.5, 1),
             color     0.2s linear;
-
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
-        /* contain: style — isolasi recalculation */
         contain: style;
-
-        /* Default state = future */
         opacity: 0.22;
         transform: scale3d(1, 1, 1);
     }
-    /* Past: sangat kecil, hampir invisible */
     .track-num[data-state="past"] {
         opacity: 0.07;
         transform: scale3d(0.78, 0.78, 1);
     }
-    /* Active: besar, gelap — scale bukan font-size! */
     .track-num[data-state="active"],
     .track-num[data-state="active-next"] {
         opacity: 1;
@@ -135,22 +140,17 @@
         color: #0f172a;
     }
 
-    /* ── track-wrapper: kotak input ─────────────────────────── */
     .track-wrapper {
         display: flex;
         justify-content: center;
         width: 100%;
         margin: 0.2rem 0;
-
         transition:
             transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
             opacity   0.3s cubic-bezier(0.25, 1, 0.5, 1);
-
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
         contain: style;
-
-        /* Default: future */
         opacity: 0.22;
         transform: scale3d(1, 1, 1);
     }
@@ -163,7 +163,6 @@
         transform: scale3d(1.12, 1.12, 1);
     }
 
-    /* ── track-box: kotak input ──────────────────────────────── */
     .track-box {
         display: flex;
         align-items: center;
@@ -175,17 +174,14 @@
         font-family: 'JetBrains Mono', monospace;
         border-radius: 0.75rem;
         background: white;
-        /* Hanya border, bukan box-shadow — box-shadow trigger repaint di iOS */
         border: 2px solid #e2e8f0;
         color: transparent;
-        /* Transition cepat untuk box state */
         transition: border-color 0.15s ease;
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
     }
     .track-box[data-state="active"] {
         border-color: #3b82f6;
-        /* Outline bukan box-shadow — lebih ringan di iOS compositor */
         outline: 3px solid rgba(59,130,246,0.18);
         outline-offset: 0;
     }
@@ -195,7 +191,6 @@
         color: #64748b;
     }
 
-    /* ── focus strip ─────────────────────────────────────────── */
     .focus-strip {
         position: absolute;
         width: 100%;
@@ -211,7 +206,6 @@
             rgba(59,130,246,0.03) 100%);
         pointer-events: none;
         z-index: 20;
-        /* Compositor layer */
         -webkit-transform: translate3d(0,-50%,0);
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
@@ -224,16 +218,20 @@
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
         cursor: pointer;
-        /* Scale transition saja — sangat ringan */
         transition: transform 0.06s ease;
         display: flex;
         align-items: center;
         justify-content: center;
     }
-    /* pressed class di-toggle via JS touchstart/touchend */
     .numpad-btn.pressed {
         transform: scale3d(0.88, 0.88, 1);
         background-color: #475569 !important;
+    }
+    /* Desktop: hover state */
+    @media (hover: hover) {
+        .numpad-btn:hover {
+            background-color: #334155 !important;
+        }
     }
 
     /* ─── TIMER PULSE ────────────────────────────────────────── */
@@ -251,9 +249,66 @@
     }
 
     /* ─── SCROLLBAR ──────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+    /* ─── DESKTOP LAYOUT OVERRIDES ──────────────────────────── */
+    @media (min-width: 1024px) {
+        /* Dashboard: sidebar + content grid */
+        #dashboard-section {
+            flex-direction: row !important;
+        }
+        #dashboard-sidebar {
+            display: flex;
+        }
+        #dashboard-main {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Test: wider numpad */
+        #numpad-panel {
+            width: 220px !important;
+        }
+
+        /* Review: 2-column */
+        #review-body {
+            flex-direction: row !important;
+        }
+        #review-stats-panel {
+            width: 280px;
+            border-right: 1px solid #f1f5f9;
+            border-bottom: none !important;
+        }
+        #review-answers-panel {
+            flex: 1;
+        }
+    }
+    @media (min-width: 1280px) {
+        #numpad-panel {
+            width: 260px !important;
+        }
+    }
+
+    /* ─── DASHBOARD CARD HOVER ──────────────────────────────── */
+    @media (hover: hover) {
+        .pkg-card:hover {
+            border-color: #93c5fd !important;
+            background: #eff6ff !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59,130,246,0.1);
+        }
+        .pkg-card-done:hover {
+            border-color: #6ee7b7 !important;
+            background: #d1fae5 !important;
+        }
+    }
+    .pkg-card {
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
     </style>
 </head>
 <body>
@@ -261,71 +316,144 @@
 <div id="app">
 
     <!-- HEADER -->
-    <header class="bg-slate-950 text-white px-5 py-3.5 flex justify-between items-center shrink-0">
-        <div class="flex items-center gap-2.5">
-            <div class="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
+    <header class="bg-slate-950 text-white px-5 py-3 flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
             </div>
-            <h1 class="text-sm font-bold tracking-widest uppercase mono">CAT<span class="text-blue-400">psiko</span></h1>
+            <div>
+                <h1 class="text-sm font-bold tracking-widest uppercase mono leading-none">CAT<span class="text-blue-400">psiko</span></h1>
+                <p class="text-[10px] text-slate-500 font-medium mono hidden sm:block">Sistem Evaluasi Komputasi</p>
+            </div>
         </div>
-        <div id="user-display" class="hidden text-xs font-semibold bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full mono text-slate-300 truncate max-w-[140px]"></div>
+        <div id="user-display" class="hidden items-center gap-2">
+            <div class="w-2 h-2 bg-emerald-400 rounded-full"></div>
+            <span class="text-xs font-semibold bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full mono text-slate-300 truncate max-w-[180px]"></span>
+        </div>
     </header>
 
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative overflow-hidden">
 
         <!-- ═══ LOGIN ═══ -->
-        <section id="login-section" class="fade-in w-full max-w-sm mx-auto flex flex-col justify-center h-full p-8">
-            <div class="mb-10">
-                <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-full mono mb-5">
-                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                    SISTEM EVALUASI AKTIF
+        <section id="login-section" class="fade-in w-full flex flex-col justify-center items-center h-full p-6 bg-slate-50">
+            <div class="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8 lg:p-10">
+                <div class="mb-8">
+                    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-full mono mb-5">
+                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                        SISTEM EVALUASI AKTIF
+                    </div>
+                    <h2 class="text-3xl lg:text-4xl font-extrabold text-slate-900 leading-tight">Komputasi<br>Deret Angka</h2>
+                    <p class="text-slate-500 text-sm mt-2 leading-relaxed">Uji akurasi &amp; kecepatan penjumlahan serial.<br class="hidden lg:block">Tersedia 20 paket simulasi.</p>
                 </div>
-                <h2 class="text-3xl font-extrabold text-slate-900 leading-tight">Komputasi<br>Deret Angka</h2>
-                <p class="text-slate-500 text-sm mt-2">Uji akurasi & kecepatan penjumlahan serial.</p>
+                <form id="login-form" class="space-y-3">
+                    <input type="text" id="student-name" required autocomplete="off"
+                        placeholder="Nama Lengkap Peserta"
+                        class="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 focus:outline-none focus:border-blue-500 text-center font-semibold text-slate-800 placeholder:text-slate-400 bg-slate-50 transition-colors">
+                    <button type="submit"
+                        class="w-full bg-slate-950 text-white font-bold py-3.5 px-4 rounded-2xl text-sm tracking-wide shadow-md hover:bg-slate-800 transition-colors"
+                        style="touch-action:manipulation;-webkit-tap-highlight-color:transparent">
+                        Masuk Sistem →
+                    </button>
+                </form>
+                <div class="mt-6 pt-6 border-t border-slate-100 grid grid-cols-3 gap-4 text-center">
+                    <div><div class="text-lg font-extrabold text-slate-900 mono">20</div><div class="text-[11px] text-slate-400 font-medium">Paket</div></div>
+                    <div><div class="text-lg font-extrabold text-slate-900 mono">99</div><div class="text-[11px] text-slate-400 font-medium">Soal/Paket</div></div>
+                    <div><div class="text-lg font-extrabold text-slate-900 mono">mod 10</div><div class="text-[11px] text-slate-400 font-medium">Metode</div></div>
+                </div>
             </div>
-            <form id="login-form" class="space-y-3">
-                <input type="text" id="student-name" required autocomplete="off"
-                    placeholder="Nama Lengkap Peserta"
-                    class="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 focus:outline-none focus:border-blue-500 text-center font-semibold text-slate-800 placeholder:text-slate-400 bg-slate-50">
-                <button type="submit"
-                    class="w-full bg-slate-950 text-white font-bold py-3.5 px-4 rounded-2xl text-sm tracking-wide shadow-md"
-                    style="touch-action:manipulation;-webkit-tap-highlight-color:transparent">
-                    Masuk Sistem →
-                </button>
-            </form>
         </section>
 
         <!-- ═══ DASHBOARD ═══ -->
-        <section id="dashboard-section" class="hidden fade-in flex-col h-full overflow-hidden bg-slate-50">
-            <div class="px-6 pt-6 pb-4 bg-white border-b border-slate-100 shrink-0">
-                <h2 class="text-lg font-extrabold text-slate-900">Modul Simulasi</h2>
-                <p class="text-slate-500 text-xs mt-0.5">20 Paket tersedia · Pilih untuk memulai</p>
-                <div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div id="overall-progress-bar" class="h-full bg-blue-500 rounded-full" style="width:0%;transition:width 0.5s ease"></div>
+        <section id="dashboard-section" class="hidden fade-in h-full overflow-hidden bg-slate-50">
+
+            <!-- Desktop sidebar -->
+            <div id="dashboard-sidebar" class="hidden w-64 xl:w-72 shrink-0 bg-white border-r border-slate-100 flex-col p-6 gap-6">
+                <div>
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mono mb-3">Progress Keseluruhan</h2>
+                    <div id="sidebar-progress-ring" class="flex items-center gap-4">
+                        <div class="relative w-16 h-16 shrink-0">
+                            <svg class="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                                <circle cx="32" cy="32" r="26" fill="none" stroke="#e2e8f0" stroke-width="6"/>
+                                <circle id="sidebar-ring-fill" cx="32" cy="32" r="26" fill="none" stroke="#3b82f6" stroke-width="6"
+                                    stroke-dasharray="163.4" stroke-dashoffset="163.4"
+                                    style="transition:stroke-dashoffset 0.5s ease"/>
+                            </svg>
+                            <span id="sidebar-pct" class="absolute inset-0 flex items-center justify-center text-xs font-extrabold text-slate-900 mono">0%</span>
+                        </div>
+                        <div>
+                            <p id="sidebar-done-text" class="text-2xl font-extrabold text-slate-900 mono">0</p>
+                            <p class="text-xs text-slate-400 font-medium">dari 20 paket selesai</p>
+                        </div>
+                    </div>
                 </div>
-                <p id="overall-progress-text" class="text-xs text-slate-400 font-medium mono mt-1">0 / 20 selesai</p>
+
+                <div class="flex-1">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mono mb-3">Statistik Sesi</h2>
+                    <div id="sidebar-stats" class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Total Benar</span>
+                            <span id="stat-correct" class="text-xs font-bold mono text-emerald-600">—</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Rata-rata Akurasi</span>
+                            <span id="stat-accuracy" class="text-xs font-bold mono text-blue-600">—</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Total Waktu</span>
+                            <span id="stat-time" class="text-xs font-bold mono text-slate-700">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-100 pt-4">
+                    <p class="text-[10px] text-slate-400 font-medium mono">CAT Rekening Koran v2</p>
+                    <p class="text-[10px] text-slate-300 mono">Sistem Evaluasi Komputasi</p>
+                </div>
             </div>
-            <div id="package-list" class="flex-1 ios-scroll grid grid-cols-2 gap-3 p-4 pb-6 content-start"></div>
+
+            <!-- Main content -->
+            <div id="dashboard-main" class="flex-1 overflow-hidden flex flex-col min-w-0">
+                <div class="px-5 lg:px-8 pt-5 pb-4 bg-white border-b border-slate-100 shrink-0">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-base lg:text-lg font-extrabold text-slate-900">Modul Simulasi</h2>
+                            <p class="text-slate-500 text-xs mt-0.5">20 Paket tersedia · Pilih untuk memulai</p>
+                        </div>
+                        <div id="mobile-progress-badge" class="lg:hidden flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full">
+                            <span id="mobile-done-count" class="text-xs font-bold mono text-blue-700">0/20</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="overall-progress-bar" class="h-full bg-blue-500 rounded-full" style="width:0%;transition:width 0.5s ease"></div>
+                    </div>
+                    <p id="overall-progress-text" class="text-xs text-slate-400 font-medium mono mt-1 lg:hidden">0 / 20 selesai</p>
+                </div>
+                <div id="package-list" class="flex-1 ios-scroll grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-4 lg:p-6 pb-6 content-start"></div>
+            </div>
+
         </section>
 
         <!-- ═══ TEST ═══ -->
         <section id="test-section" class="hidden fade-in flex-col h-full">
 
             <!-- Top bar -->
-            <div class="flex items-center justify-between px-4 py-2.5 bg-slate-950 text-white shrink-0">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-slate-950 text-white shrink-0 border-b border-slate-800">
                 <button id="btn-cancel-test"
-                    class="text-xs font-bold text-slate-400 px-2 py-1 rounded-lg"
+                    class="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800 transition-colors"
                     style="touch-action:manipulation;-webkit-tap-highlight-color:transparent">
                     ✕ Batal
                 </button>
-                <div class="flex items-center gap-2 bg-blue-600 px-4 py-1.5 rounded-full">
-                    <svg class="w-3 h-3 text-blue-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span id="timer-display" class="mono text-sm font-extrabold text-white timer-running">00:00</span>
+                <div class="flex items-center gap-3">
+                    <div id="test-pkg-badge" class="hidden lg:block text-xs font-bold mono text-slate-400 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full"></div>
+                    <div class="flex items-center gap-2 bg-blue-600 px-4 py-1.5 rounded-full">
+                        <svg class="w-3 h-3 text-blue-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span id="timer-display" class="mono text-sm font-extrabold text-white timer-running">00:00</span>
+                    </div>
                 </div>
                 <span id="progress-text" class="mono text-xs font-bold text-slate-400 tabular-nums">0 / 99</span>
             </div>
@@ -338,7 +466,7 @@
             <!-- Track + Numpad -->
             <div class="flex flex-row flex-1 overflow-hidden">
 
-                <!-- ✅ Scrolling track — GPU layer -->
+                <!-- Scrolling track -->
                 <div id="test-viewport" class="flex-1 relative overflow-hidden bg-white"
                      style="-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden">
                     <div class="focus-strip"></div>
@@ -346,7 +474,7 @@
                 </div>
 
                 <!-- Numpad RIGHT -->
-                <div class="w-[148px] sm:w-[164px] shrink-0 flex flex-col items-center justify-center bg-slate-950 border-l border-slate-800 py-5 px-3 gap-3">
+                <div id="numpad-panel" class="w-[148px] sm:w-[172px] shrink-0 flex flex-col items-center justify-center bg-slate-950 border-l border-slate-800 py-5 px-3 gap-3">
                     <div id="numpad-pkg-label" class="text-[10px] font-bold mono text-slate-500 tracking-widest uppercase text-center"></div>
                     <div class="grid grid-cols-3 gap-2 w-full">
                         <button class="numpad-btn bg-slate-800 text-white text-xl font-bold py-4 rounded-xl border border-slate-700" data-val="1">1</button>
@@ -369,23 +497,34 @@
 
         <!-- ═══ REVIEW ═══ -->
         <section id="review-section" class="hidden fade-in h-full flex flex-col bg-white">
-            <div class="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
-                <p id="review-pkg-label" class="text-xs font-bold mono text-blue-600 uppercase tracking-widest mb-1"></p>
-                <h2 class="text-xl font-extrabold text-slate-900">Laporan Evaluasi</h2>
+            <!-- Header -->
+            <div class="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0 flex items-center justify-between">
+                <div>
+                    <p id="review-pkg-label" class="text-xs font-bold mono text-blue-600 uppercase tracking-widest mb-1"></p>
+                    <h2 class="text-xl font-extrabold text-slate-900">Laporan Evaluasi</h2>
+                </div>
+                <div class="flex gap-2 shrink-0">
+                    <button id="btn-back-dashboard"
+                        style="touch-action:manipulation;-webkit-tap-highlight-color:transparent"
+                        class="bg-slate-100 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-sm hover:bg-slate-200 transition-colors">
+                        ← Menu
+                    </button>
+                    <button id="btn-next-package"
+                        style="touch-action:manipulation;-webkit-tap-highlight-color:transparent"
+                        class="hidden bg-slate-950 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-md hover:bg-slate-800 transition-colors">
+                        Lanjut →
+                    </button>
+                </div>
             </div>
-            <div id="review-stats" class="grid grid-cols-3 gap-3 px-5 py-4 shrink-0 bg-slate-50 border-b border-slate-100"></div>
-            <div class="flex-1 ios-scroll px-5 py-4" id="wrong-answers-container"></div>
-            <div class="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
-                <button id="btn-back-dashboard"
-                    style="touch-action:manipulation;-webkit-tap-highlight-color:transparent"
-                    class="flex-1 bg-slate-100 text-slate-700 font-bold py-3.5 rounded-2xl text-sm">
-                    ← Menu
-                </button>
-                <button id="btn-next-package"
-                    style="touch-action:manipulation;-webkit-tap-highlight-color:transparent"
-                    class="hidden flex-1 bg-slate-950 text-white font-bold py-3.5 rounded-2xl text-sm shadow-md">
-                    Lanjut →
-                </button>
+
+            <!-- Body: stats + wrong answers -->
+            <div id="review-body" class="flex-1 overflow-hidden flex flex-col lg:flex-row">
+                <!-- Stats panel -->
+                <div id="review-stats-panel" class="shrink-0 bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-100">
+                    <div id="review-stats" class="grid grid-cols-3 lg:grid-cols-1 gap-3 px-5 py-4 lg:py-5 lg:px-6"></div>
+                </div>
+                <!-- Wrong answers -->
+                <div id="review-answers-panel" class="flex-1 ios-scroll px-5 py-4 lg:px-6 lg:py-5" id="wrong-answers-container"></div>
             </div>
         </section>
 
@@ -393,14 +532,10 @@
 </div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-//  ✅ iOS VIEWPORT FIX
-//  Jalankan setAppHeight() saat load & resize
-// ══════════════════════════════════════════════════════════
+// ═══ iOS / DESKTOP VIEWPORT FIX ═══
 function setAppHeight() {
     const h = window.innerHeight;
     document.documentElement.style.setProperty('--app-h', h + 'px');
-    // Recalculate centering padding untuk test-track
     const vp = document.getElementById('test-viewport');
     if (vp) {
         const half = Math.round(vp.clientHeight / 2);
@@ -410,20 +545,15 @@ function setAppHeight() {
 window.addEventListener('resize', setAppHeight);
 setAppHeight();
 
-// ── Prevent body scroll di iOS ──
 document.addEventListener('touchmove', e => {
     if (!e.target.closest('.ios-scroll')) e.preventDefault();
 }, { passive: false });
 
-// ══════════════════════════════════════════════════════════
-//  CONFIG
-// ══════════════════════════════════════════════════════════
+// ═══ CONFIG ═══
 const TOTAL_PACKAGES      = 20;
 const NUMBERS_PER_PACKAGE = 100;
 
-// ══════════════════════════════════════════════════════════
-//  TIMER
-// ══════════════════════════════════════════════════════════
+// ═══ TIMER ═══
 let timerInterval  = null;
 let elapsedSeconds = 0;
 
@@ -447,9 +577,7 @@ function formatTime(sec) {
     return m > 0 ? `${m}m ${s.toString().padStart(2,'0')}s` : `${s}s`;
 }
 
-// ══════════════════════════════════════════════════════════
-//  STATE
-// ══════════════════════════════════════════════════════════
+// ═══ STATE ═══
 const state = {
     studentName: '',
     packages: [],
@@ -460,7 +588,6 @@ const state = {
     sessionTime: 0
 };
 
-// Track index sebelumnya — untuk minimal DOM update
 let prevFocusIndex = -1;
 
 const views = {
@@ -480,9 +607,7 @@ function switchView(name) {
     requestAnimationFrame(setAppHeight);
 }
 
-// ══════════════════════════════════════════════════════════
-//  DATA
-// ══════════════════════════════════════════════════════════
+// ═══ DATA ═══
 function generatePackages() {
     return Array.from({ length: TOTAL_PACKAGES }, (_, i) => ({
         id: i,
@@ -492,37 +617,70 @@ function generatePackages() {
     }));
 }
 
-// ══════════════════════════════════════════════════════════
-//  LOGIN
-// ══════════════════════════════════════════════════════════
+// ═══ LOGIN ═══
 document.getElementById('login-form').addEventListener('submit', e => {
     e.preventDefault();
     const name = document.getElementById('student-name').value.trim();
     if (!name) return;
     state.studentName = name;
-    document.getElementById('user-display').textContent = name;
-    document.getElementById('user-display').classList.remove('hidden');
+    const udEl = document.getElementById('user-display');
+    udEl.querySelector('span').textContent = name;
+    udEl.classList.remove('hidden');
+    udEl.classList.add('flex');
     state.packages = generatePackages();
     renderDashboard();
     switchView('dashboard');
 });
 
-// ══════════════════════════════════════════════════════════
-//  DASHBOARD
-// ══════════════════════════════════════════════════════════
+// ═══ DASHBOARD ═══
 function renderDashboard() {
     const list      = document.getElementById('package-list');
     const completed = state.packages.filter(p => p.completed).length;
-    document.getElementById('overall-progress-bar').style.width = `${(completed/TOTAL_PACKAGES)*100}%`;
-    document.getElementById('overall-progress-text').textContent = `${completed} / ${TOTAL_PACKAGES} selesai`;
+    const pct       = Math.round((completed / TOTAL_PACKAGES) * 100);
 
+    // Top bar progress
+    document.getElementById('overall-progress-bar').style.width = `${pct}%`;
+    document.getElementById('overall-progress-text').textContent = `${completed} / ${TOTAL_PACKAGES} selesai`;
+    document.getElementById('mobile-done-count').textContent = `${completed}/20`;
+
+    // Sidebar (desktop)
+    const ringEl = document.getElementById('sidebar-ring-fill');
+    if (ringEl) {
+        const circ = 163.4;
+        ringEl.style.strokeDashoffset = circ - (circ * pct / 100);
+    }
+    const sdText = document.getElementById('sidebar-done-text');
+    if (sdText) sdText.textContent = completed;
+    const sdPct = document.getElementById('sidebar-pct');
+    if (sdPct) sdPct.textContent = pct + '%';
+
+    // Sidebar stats
+    const completedPkgs = state.packages.filter(p => p.completed);
+    const totalCorrect  = completedPkgs.reduce((acc, p) => {
+        const correct = state.answers ? 0 : 0; // calculated from pkg.score
+        return acc + Math.round((p.score / 100) * 99);
+    }, 0);
+    const avgAcc = completedPkgs.length
+        ? Math.round(completedPkgs.reduce((a, p) => a + p.score, 0) / completedPkgs.length)
+        : null;
+    const totalTime = completedPkgs.reduce((a, p) => a + (p.time || 0), 0);
+
+    document.getElementById('stat-correct').textContent  = completedPkgs.length ? totalCorrect : '—';
+    document.getElementById('stat-accuracy').textContent = avgAcc !== null ? avgAcc + '%' : '—';
+    document.getElementById('stat-time').textContent     = completedPkgs.length ? formatTime(totalTime) : '—';
+
+    // Show sidebar on desktop
+    const sidebar = document.getElementById('dashboard-sidebar');
+    if (sidebar) sidebar.style.display = '';
+
+    // Package grid
     list.innerHTML = '';
     const frag = document.createDocumentFragment();
     state.packages.forEach((pkg, index) => {
         const done = pkg.completed;
         const btn  = document.createElement('button');
         btn.style.cssText = 'touch-action:manipulation;-webkit-tap-highlight-color:transparent';
-        btn.className = `flex flex-col p-4 rounded-2xl border-2 text-left ${
+        btn.className = `pkg-card ${done ? 'pkg-card-done' : ''} flex flex-col p-4 rounded-2xl border-2 text-left ${
             done ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-white'
         }`;
         btn.innerHTML = `
@@ -544,37 +702,34 @@ function renderDashboard() {
     list.appendChild(frag);
 }
 
-// ══════════════════════════════════════════════════════════
-//  TEST START
-// ══════════════════════════════════════════════════════════
+// ═══ TEST START ═══
 function startTest(pkgIndex) {
     state.currentPackageIndex  = pkgIndex;
     state.currentQuestionIndex = 0;
     state.answers              = [];
     state.isTestActive         = true;
-    prevFocusIndex             = -1; // reset tracker
+    prevFocusIndex             = -1;
 
-    document.getElementById('numpad-pkg-label').textContent = state.packages[pkgIndex].title;
+    const label = state.packages[pkgIndex].title;
+    document.getElementById('numpad-pkg-label').textContent = label;
+    const badge = document.getElementById('test-pkg-badge');
+    if (badge) badge.textContent = label;
+
     buildTestTrack();
     switchView('test');
     startTimer();
 
-    // Tunggu layout selesai, lalu set padding + focus awal
     setTimeout(() => {
         setAppHeight();
         updateFocus(0);
     }, 80);
 }
 
-// ══════════════════════════════════════════════════════════
-//  BUILD TRACK
-//  Gunakan DocumentFragment → satu append → satu reflow
-// ══════════════════════════════════════════════════════════
+// ═══ BUILD TRACK ═══
 function buildTestTrack() {
     const pkg   = state.packages[state.currentPackageIndex];
     const track = document.getElementById('test-track');
 
-    // Reset
     track.innerHTML = '';
     track.style.transform = 'translate3d(0,0,0)';
 
@@ -585,14 +740,12 @@ function buildTestTrack() {
     const frag = document.createDocumentFragment();
 
     pkg.numbers.forEach((num, i) => {
-        // Angka — class track-num, default state = future (tidak perlu set)
         const numDiv = document.createElement('div');
-        numDiv.id        = `n${i}`;   // id pendek → DOM lebih ringan
+        numDiv.id        = `n${i}`;
         numDiv.className = 'track-num';
         numDiv.textContent = num;
         frag.appendChild(numDiv);
 
-        // Input slot
         if (i < pkg.numbers.length - 1) {
             const wrapper = document.createElement('div');
             wrapper.id        = `w${i}`;
@@ -610,17 +763,7 @@ function buildTestTrack() {
     track.appendChild(frag);
 }
 
-// ══════════════════════════════════════════════════════════
-//  ✅ UPDATE FOCUS — MINIMAL DOM WRITES
-//
-//  Sebelumnya: loop 200 elemen × ganti className string → 200 style recalculation
-//  Sekarang:   hanya 5–6 elemen × set 1 data attribute → ~6 style recalculation
-//
-//  Pattern:
-//  1. READ semua offsetTop sebelum write apapun
-//  2. Dalam satu RAF: set data-state hanya pada elemen yang BERUBAH
-//  3. JS tidak menyentuh transition/font-size — CSS yang handle via [data-state]
-// ══════════════════════════════════════════════════════════
+// ═══ UPDATE FOCUS ═══
 function updateFocus(index) {
     const pkg    = state.packages[state.currentPackageIndex];
     const track  = document.getElementById('test-track');
@@ -630,7 +773,6 @@ function updateFocus(index) {
     if (!target) return;
     state.currentQuestionIndex = index;
 
-    // ── PHASE 1: READ (sebelum any write) ──
     const vpH      = vp.clientHeight;
     const targTop  = target.offsetTop;
     const targH    = target.clientHeight;
@@ -639,10 +781,7 @@ function updateFocus(index) {
     const total = pkg.numbers.length - 1;
     const prev  = prevFocusIndex;
 
-    // ── PHASE 2: WRITE dalam satu RAF ──
     requestAnimationFrame(() => {
-
-        // 1. Demote elemen lama → past  (hanya jika ada prev)
         if (prev >= 0) {
             const pNum  = document.getElementById(`n${prev}`);
             const pNext = document.getElementById(`n${prev+1}`);
@@ -655,7 +794,6 @@ function updateFocus(index) {
             if (pBox && pBox.dataset.state === 'active') pBox.dataset.state = '';
         }
 
-        // 2. Promote elemen baru → active
         const cNum  = document.getElementById(`n${index}`);
         const cNext = document.getElementById(`n${index+1}`);
         const cWrap = document.getElementById(`w${index}`);
@@ -666,10 +804,8 @@ function updateFocus(index) {
         if (cWrap) cWrap.dataset.state = 'active';
         if (cBox)  cBox.dataset.state  = 'active';
 
-        // 3. Scroll track — translate3d untuk GPU compositing
         track.style.transform = `translate3d(0, ${translateY}px, 0)`;
 
-        // 4. Progress UI
         document.getElementById('progress-text').textContent = `${index} / ${total}`;
         document.getElementById('progress-bar-fill').style.width = `${(index/total)*100}%`;
 
@@ -677,9 +813,7 @@ function updateFocus(index) {
     });
 }
 
-// ══════════════════════════════════════════════════════════
-//  INPUT — touchstart (zero-delay) + click fallback
-// ══════════════════════════════════════════════════════════
+// ═══ INPUT ═══
 let inputLocked = false;
 
 function processInput(valStr) {
@@ -692,12 +826,11 @@ function processInput(valStr) {
     const pkg     = state.packages[state.currentPackageIndex];
     const total   = pkg.numbers.length - 1;
 
-    // Tampilkan jawaban di box — minimal write
     const box = document.getElementById(`b${idx}`);
     if (box) {
-        box.textContent      = userAns;
-        box.style.color      = '#475569';
-        box.dataset.state    = 'done';
+        box.textContent   = userAns;
+        box.style.color   = '#475569';
+        box.dataset.state = 'done';
     }
 
     const expected = (pkg.numbers[idx] + pkg.numbers[idx+1]) % 10;
@@ -755,9 +888,7 @@ document.getElementById('btn-cancel-test').addEventListener('click', () => {
     }
 });
 
-// ══════════════════════════════════════════════════════════
-//  FINISH & REVIEW
-// ══════════════════════════════════════════════════════════
+// ═══ FINISH & REVIEW ═══
 function finishTest() {
     const correct = state.answers.filter(a => a.isCorrect).length;
     const total   = state.answers.length;
@@ -780,20 +911,21 @@ function renderReview() {
 
     const accColor = acc >= 80 ? 'text-emerald-600' : acc >= 60 ? 'text-amber-500' : 'text-red-500';
     document.getElementById('review-stats').innerHTML = `
-        <div class="text-center">
+        <div class="text-center lg:text-left lg:bg-white lg:rounded-2xl lg:p-4 lg:border lg:border-slate-100">
             <div class="text-2xl font-extrabold text-slate-900 mono">${state.answers.length}</div>
-            <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Total</div>
+            <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Total Soal</div>
         </div>
-        <div class="text-center">
+        <div class="text-center lg:text-left lg:bg-white lg:rounded-2xl lg:p-4 lg:border lg:border-slate-100">
             <div class="text-2xl font-extrabold mono ${accColor}">${acc}%</div>
             <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Akurasi</div>
         </div>
-        <div class="text-center">
+        <div class="text-center lg:text-left lg:bg-white lg:rounded-2xl lg:p-4 lg:border lg:border-slate-100">
             <div class="text-2xl font-extrabold text-blue-600 mono">${formatTime(state.sessionTime)}</div>
             <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Waktu</div>
         </div>`;
 
-    const container = document.getElementById('wrong-answers-container');
+    // Wrong answers — ke panel yang benar
+    const container = document.getElementById('review-answers-panel') || document.getElementById('wrong-answers-container');
     container.innerHTML = '';
 
     if (wrong.length === 0) {
