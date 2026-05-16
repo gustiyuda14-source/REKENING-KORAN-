@@ -48,25 +48,14 @@
         transform: translateZ(0);
     }
 
-    /* Mobile: full screen tanpa radius */
+    /* Mobile: full screen */
     @media (max-width: 767px) {
         html, body { align-items: stretch; }
         #app { height: var(--app-h); }
     }
 
-    /* Tablet: card dengan shadow */
-    @media (min-width: 768px) and (max-width: 1023px) {
-        html, body { background: #e2e8f0; }
-        #app {
-            max-width: 680px;
-            height: calc(var(--app-h) - 48px);
-            border-radius: 1.5rem;
-            box-shadow: 0 32px 64px -12px rgba(0,0,0,0.28);
-        }
-    }
-
-    /* Desktop: full-width web app */
-    @media (min-width: 1024px) {
+    /* Tablet & Desktop: full screen, no card */
+    @media (min-width: 768px) {
         html, body {
             background: #f1f5f9;
             align-items: stretch;
@@ -74,7 +63,6 @@
         }
         #app {
             max-width: none;
-            height: 100vh;
             height: var(--app-h);
             border-radius: 0;
             box-shadow: none;
