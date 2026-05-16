@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CATpsiko — Sistem Evaluasi Komputasi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        * { -webkit-font-smoothing: antialiased; }
+
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .fade-in {
+            animation: fadeIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        #test-track {
+            will-change: transform;
+            transition: transform 0.38s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .item-transition {
+            transition: all 0.38s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* Numpad tap UX */
+        .numpad-btn {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: transform 0.1s ease, background-color 0.1s ease, box-shadow 0.1s ease;
+            user-select: none;
+        }
+        .numpad-btn:active {
+            transform: scale(0.91);
+            background-color: #dde3ed;
+            box-shadow: none;
+        }
+
+        /* Timer pulse animation when running */
+        @keyframes timerPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .timer-running {
+            animation: timerPulse 2s ease-in-out infinite;
+        }
+
+        /* Progress bar fill */
+        #progress-bar-fill {
+            transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* Package card completed state */
+        .pkg-completed {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        }
+
+        /* Scrollbar minimal */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+        /* Focus ring highlight strip */
+        .focus-strip {
+            background: linear-gradient(90deg, rgba(59,130,246,0.04) 0%, rgba(59,130,246,0.12) 50%, rgba(59,130,246,0.04) 100%);
+        }
+    </style>
+</head>
+<body class="bg-slate-200 text-gray-800 min-h-screen flex items-center justify-center overscroll-none">
+
+    <div id="app" class="w-full max-w-lg bg-white shadow-2xl md:rounded-3xl overflow-hidden h-[100dvh] md:h-[800px] flex flex-col">
+
+        <!-- ===== HEADER ===== -->
+        <header class="bg-slate-950 text-white px-5 py-3.5 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <h1 class="text-sm font-bold tracking-widest uppercase mono">CAT<span class="text-blue-400">psiko</span></h1>
+            </div>
+            <div id="user-display" class="hidden text-xs font-semibold bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full mono text-slate-300 truncate max-w-[140px]"></div>
+        </header>
+
+        <main class="flex-1 flex flex-col relative overflow-hidden">
+
+            <!-- ===== LOGIN ===== -->
+            <section id="login-section" class="fade-in w-full max-w-sm mx-auto flex flex-col justify-center h-full p-8">
+                <div class="mb-10">
+                    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-full mono mb-5">
+                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                        SISTEM EVALUASI AKTIF
+                    </div>
+                    <h2 class="text-3xl font-extrabold text-slate-900 leading-tight">Komputasi<br>Deret Angka</h2>
+                    <p class="text-slate-500 text-sm mt-2">Uji akurasi & kecepatan penjumlahan serial.</p>
+                </div>
+                <form id="login-form" class="space-y-3">
+                    <input type="text" id="student-name" required autocomplete="off"
+                        placeholder="Nama Lengkap Peserta"
+                        class="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 focus:ring-0 focus:border-blue-500 transition-all outline-none text-center font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal bg-slate-50">
+                    <button type="submit"
+                        class="w-full bg-slate-950 hover:bg-blue-600 text-white font-bold py-3.5 px-4 rounded-2xl transition-all duration-200 shadow-md text-sm tracking-wide">
+                        Masuk Sistem →
+                    </button>
+                </form>
+            </section>
+
+            <!-- ===== DASHBOARD ===== -->
+            <section id="dashboard-section" class="hidden fade-in flex-col h-full overflow-hidden bg-slate-50">
+                <div class="px-6 pt-6 pb-4 bg-white border-b border-slate-100 shrink-0">
+                    <h2 class="text-lg font-extrabold text-slate-900">Modul Simulasi</h2>
+                    <p class="text-slate-500 text-xs mt-0.5">20 Paket tersedia · Pilih untuk memulai</p>
+                    <!-- Overall progress bar -->
+                    <div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="overall-progress-bar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width:0%"></div>
+                    </div>
+                    <p id="overall-progress-text" class="text-xs text-slate-400 font-medium mono mt-1">0 / 20 selesai</p>
+                </div>
+                <div id="package-list" class="flex-1 overflow-y-auto grid grid-cols-2 gap-3 p-4 pb-6 content-start"></div>
+            </section>
+
+            <!-- ===== TEST ===== -->
+            <section id="test-section" class="hidden fade-in flex-col h-full">
+
+                <!-- Test top bar -->
+                <div class="flex items-center justify-between px-4 py-2.5 bg-slate-950 text-white shrink-0">
+                    <button id="btn-cancel-test"
+                        class="text-xs font-bold text-slate-400 hover:text-red-400 transition-colors px-2 py-1 rounded-lg">
+                        ✕ Batal
+                    </button>
+
+                    <!-- Count-up Timer -->
+                    <div id="timer-container" class="flex items-center gap-2 bg-blue-600 px-4 py-1.5 rounded-full">
+                        <svg class="w-3 h-3 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span id="timer-display" class="mono text-sm font-extrabold text-white timer-running">00:00</span>
+                    </div>
+
+                    <span id="progress-text" class="mono text-xs font-bold text-slate-400 tabular-nums">0 / 99</span>
+                </div>
+
+                <!-- Progress bar thin strip -->
+                <div class="h-[3px] bg-slate-800 shrink-0">
+                    <div id="progress-bar-fill" class="h-full bg-blue-500" style="width:0%"></div>
+                </div>
+
+                <!-- Main area: LEFT track + RIGHT numpad -->
+                <div class="flex flex-row flex-1 overflow-hidden">
+
+                    <!-- Scrolling Number Track -->
+                    <div id="test-viewport" class="flex-1 relative overflow-hidden flex flex-col justify-center bg-white">
+                        <!-- Focus highlight strip -->
+                        <div class="focus-strip absolute w-full h-[68px] border-y border-blue-200 pointer-events-none z-20 left-0 top-1/2 -translate-y-1/2"></div>
+
+                        <div id="test-track" class="absolute w-full left-0 top-0 flex flex-col items-center py-[50vh]"></div>
+                    </div>
+
+                    <!-- Numpad RIGHT -->
+                    <div class="w-[148px] sm:w-[164px] shrink-0 flex flex-col items-center justify-center bg-slate-950 border-l border-slate-800 py-5 px-3 gap-3">
+
+                        <!-- Package label -->
+                        <div id="numpad-pkg-label" class="text-[10px] font-bold mono text-slate-500 tracking-widest uppercase text-center"></div>
+
+                        <!-- Number grid -->
+                        <div class="grid grid-cols-3 gap-2 w-full">
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="1">1</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="2">2</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="3">3</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="4">4</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="5">5</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="6">6</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="7">7</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="8">8</button>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="9">9</button>
+                            <div></div>
+                            <button class="numpad-btn bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold py-4 rounded-xl shadow-sm border border-slate-700 select-none" data-val="0">0</button>
+                            <div></div>
+                        </div>
+
+                        <!-- Hint label -->
+                        <p class="text-[9px] text-slate-600 font-medium text-center mono mt-1">(a + b) mod 10</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== REVIEW ===== -->
+            <section id="review-section" class="hidden fade-in h-full flex flex-col bg-white">
+
+                <!-- Review header -->
+                <div class="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
+                    <p id="review-pkg-label" class="text-xs font-bold mono text-blue-600 uppercase tracking-widest mb-1"></p>
+                    <h2 class="text-xl font-extrabold text-slate-900">Laporan Evaluasi</h2>
+                </div>
+
+                <!-- Stats row -->
+                <div id="review-stats" class="grid grid-cols-3 gap-3 px-5 py-4 shrink-0 bg-slate-50 border-b border-slate-100"></div>
+
+                <!-- Wrong answers list -->
+                <div class="flex-1 overflow-y-auto px-5 py-4" id="wrong-answers-container"></div>
+
+                <!-- Action buttons -->
+                <div class="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+                    <button id="btn-back-dashboard"
+                        class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-2xl transition-colors text-sm">
+                        ← Menu
+                    </button>
+                    <button id="btn-next-package"
+                        class="hidden flex-1 bg-slate-950 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all text-sm shadow-md">
+                        Lanjut →
+                    </button>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+    // ============================
+    //  CONFIGURATION
+    // ============================
+    const TOTAL_PACKAGES     = 20;
+    const NUMBERS_PER_PACKAGE = 100;
+
+    // ============================
+    //  TIMER STATE
+    // ============================
+    let timerInterval   = null;
+    let elapsedSeconds  = 0;
+
+    function startTimer() {
+        elapsedSeconds = 0;
+        renderTimer();
+        timerInterval = setInterval(() => {
+            elapsedSeconds++;
+            renderTimer();
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        state.sessionTime = elapsedSeconds;
+    }
+
+    function renderTimer() {
+        const m = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+        const s = (elapsedSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('timer-display').textContent = `${m}:${s}`;
+    }
+
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return m > 0 ? `${m}m ${s.toString().padStart(2,'0')}s` : `${s}s`;
+    }
+
+    // ============================
+    //  APP STATE
+    // ============================
+    const state = {
+        studentName: '',
+        packages: [],
+        currentPackageIndex: null,
+        currentQuestionIndex: 0,
+        answers: [],
+        isTestActive: false,
+        sessionTime: 0
+    };
+
+    const views = {
+        login:     document.getElementById('login-section'),
+        dashboard: document.getElementById('dashboard-section'),
+        test:      document.getElementById('test-section'),
+        review:    document.getElementById('review-section')
+    };
+
+    // ============================
+    //  VIEW SWITCHER
+    // ============================
+    function switchView(name) {
+        Object.values(views).forEach(el => {
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        });
+        views[name].classList.remove('hidden');
+        views[name].classList.add('flex');
+    }
+
+    // ============================
+    //  DATA GENERATION
+    // ============================
+    function generatePackages() {
+        return Array.from({ length: TOTAL_PACKAGES }, (_, i) => ({
+            id: i,
+            title: `Paket ${String(i + 1).padStart(2, '0')}`,
+            numbers: Array.from({ length: NUMBERS_PER_PACKAGE }, () => Math.floor(Math.random() * 9) + 1),
+            completed: false,
+            score: null,
+            time: null
+        }));
+    }
+
+    // ============================
+    //  LOGIN
+    // ============================
+    document.getElementById('login-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const name = document.getElementById('student-name').value.trim();
+        if (!name) return;
+        state.studentName = name;
+        document.getElementById('user-display').textContent = name;
+        document.getElementById('user-display').classList.remove('hidden');
+        state.packages = generatePackages();
+        renderDashboard();
+        switchView('dashboard');
+    });
+
+    // ============================
+    //  DASHBOARD
+    // ============================
+    function renderDashboard() {
+        const list      = document.getElementById('package-list');
+        const completed = state.packages.filter(p => p.completed).length;
+
+        // Overall progress
+        document.getElementById('overall-progress-bar').style.width = `${(completed / TOTAL_PACKAGES) * 100}%`;
+        document.getElementById('overall-progress-text').textContent = `${completed} / ${TOTAL_PACKAGES} selesai`;
+
+        list.innerHTML = '';
+        state.packages.forEach((pkg, index) => {
+            const done = pkg.completed;
+            const btn  = document.createElement('button');
+            btn.className = [
+                'flex flex-col p-4 rounded-2xl border-2 text-left transition-all',
+                done
+                    ? 'border-emerald-200 bg-emerald-50 hover:border-emerald-300'
+                    : 'border-slate-100 bg-white hover:border-blue-400 hover:shadow-md'
+            ].join(' ');
+
+            btn.innerHTML = `
+                <div class="flex items-start justify-between w-full mb-2">
+                    <span class="mono text-[10px] font-bold tracking-widest text-slate-400 uppercase">${pkg.title}</span>
+                    <span class="w-5 h-5 flex items-center justify-center rounded-full ${done ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}">
+                        ${done
+                            ? `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`
+                            : `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`
+                        }
+                    </span>
+                </div>
+                <div class="text-xl font-extrabold text-slate-900">${done ? pkg.score + '%' : '—'}</div>
+                <div class="text-[11px] font-medium mt-0.5 ${done ? 'text-emerald-600' : 'text-slate-400'}">
+                    ${done ? formatTime(pkg.time) : '99 soal'}
+                </div>
+            `;
+            btn.onclick = () => startTest(index);
+            list.appendChild(btn);
+        });
+    }
+
+    // ============================
+    //  TEST START
+    // ============================
+    function startTest(pkgIndex) {
+        state.currentPackageIndex  = pkgIndex;
+        state.currentQuestionIndex = 0;
+        state.answers              = [];
+        state.isTestActive         = true;
+
+        // Label on numpad
+        document.getElementById('numpad-pkg-label').textContent =
+            state.packages[pkgIndex].title;
+
+        buildTestTrack();
+        switchView('test');
+        startTimer();
+
+        setTimeout(() => updateFocus(0), 60);
+    }
+
+    // ============================
+    //  BUILD TRACK
+    // ============================
+    function buildTestTrack() {
+        const pkg   = state.packages[state.currentPackageIndex];
+        const track = document.getElementById('test-track');
+        track.innerHTML = '';
+        track.style.transform = 'translateY(0)';
+
+        const total = pkg.numbers.length - 1;
+        document.getElementById('progress-text').textContent = `0 / ${total}`;
+        document.getElementById('progress-bar-fill').style.width = '0%';
+
+        pkg.numbers.forEach((num, i) => {
+            // Number row
+            const numDiv = document.createElement('div');
+            numDiv.id        = `num-${i}`;
+            numDiv.className = 'item-transition text-xl font-bold text-slate-400 opacity-30 w-full text-center py-2';
+            numDiv.textContent = num;
+            track.appendChild(numDiv);
+
+            // Input slot (between each pair)
+            if (i < pkg.numbers.length - 1) {
+                const wrapper = document.createElement('div');
+                wrapper.id        = `wrapper-${i}`;
+                wrapper.className = 'item-transition w-full flex justify-center my-1 opacity-30';
+
+                const box = document.createElement('div');
+                box.id        = `input-${i}`;
+                box.className = 'flex items-center justify-center w-11 h-11 text-lg font-extrabold border-2 border-slate-200 bg-white rounded-xl shadow-sm text-transparent transition-all mono';
+
+                wrapper.appendChild(box);
+                track.appendChild(wrapper);
+            }
+        });
+    }
+
+    // ============================
+    //  FOCUS UPDATE
+    // ============================
+    function updateFocus(index) {
+        const pkg      = state.packages[state.currentPackageIndex];
+        const track    = document.getElementById('test-track');
+        const viewport = document.getElementById('test-viewport');
+        const target   = document.getElementById(`wrapper-${index}`);
+
+        if (!target) return;
+        state.currentQuestionIndex = index;
+
+        const total = pkg.numbers.length - 1;
+
+        for (let i = 0; i < pkg.numbers.length; i++) {
+            const elNum     = document.getElementById(`num-${i}`);
+            const elWrapper = document.getElementById(`wrapper-${i}`);
+            const elInput   = document.getElementById(`input-${i}`);
+
+            if (i < index) {
+                // Past — faded & shrunk
+                if (elNum)     elNum.className     = 'item-transition text-lg font-bold text-slate-400 opacity-10 w-full text-center py-1.5 scale-90';
+                if (elWrapper) elWrapper.className  = 'item-transition w-full flex justify-center my-1 opacity-10 scale-90';
+                if (elInput)   elInput.className    = 'flex items-center justify-center w-11 h-11 text-lg font-extrabold border-transparent bg-slate-100 text-slate-400 rounded-xl mono transition-all';
+            } else if (i === index) {
+                // Active pair
+                if (elNum)     elNum.className     = 'item-transition text-3xl font-extrabold text-slate-900 opacity-100 w-full text-center py-2 scale-110';
+                const nextNum = document.getElementById(`num-${i + 1}`);
+                if (nextNum)   nextNum.className    = 'item-transition text-3xl font-extrabold text-slate-900 opacity-100 w-full text-center py-2 scale-110';
+                if (elWrapper) elWrapper.className  = 'item-transition w-full flex justify-center my-2 opacity-100 scale-110 z-10';
+                if (elInput)   elInput.className    = 'flex items-center justify-center w-11 h-11 text-lg font-extrabold border-2 border-blue-500 bg-white rounded-xl shadow-[0_0_18px_rgba(59,130,246,0.35)] text-transparent mono transition-all';
+            } else if (i > index + 1) {
+                // Future — subtle
+                if (elNum)     elNum.className     = 'item-transition text-xl font-bold text-slate-400 opacity-25 w-full text-center py-2';
+                if (elWrapper) elWrapper.className  = 'item-transition w-full flex justify-center my-1 opacity-25';
+            }
+        }
+
+        // Scroll track
+        const centerY  = viewport.clientHeight / 2;
+        const elemMidY = target.offsetTop + target.clientHeight / 2;
+        track.style.transform = `translateY(${centerY - elemMidY}px)`;
+
+        // Update progress
+        document.getElementById('progress-text').textContent = `${index} / ${total}`;
+        document.getElementById('progress-bar-fill').style.width = `${(index / total) * 100}%`;
+    }
+
+    // ============================
+    //  INPUT HANDLER
+    // ============================
+    function processInput(valStr) {
+        if (!state.isTestActive) return;
+
+        const userAns = parseInt(valStr, 10);
+        const idx     = state.currentQuestionIndex;
+        const pkg     = state.packages[state.currentPackageIndex];
+        const total   = pkg.numbers.length - 1;
+
+        // Show answer in box
+        const box = document.getElementById(`input-${idx}`);
+        if (box) {
+            box.textContent = userAns;
+            box.classList.remove('text-transparent');
+            box.classList.add('text-slate-700');
+        }
+
+        const expected = (pkg.numbers[idx] + pkg.numbers[idx + 1]) % 10;
+
+        state.answers.push({
+            num1: pkg.numbers[idx],
+            num2: pkg.numbers[idx + 1],
+            userAnswer: userAns,
+            expectedAnswer: expected,
+            isCorrect: userAns === expected
+        });
+
+        const next = idx + 1;
+        if (next < total) {
+            updateFocus(next);
+        } else {
+            // Final answer
+            state.isTestActive = false;
+            stopTimer();
+            document.getElementById('progress-text').textContent = 'Memproses…';
+            document.getElementById('progress-bar-fill').style.width = '100%';
+            setTimeout(finishTest, 700);
+        }
+    }
+
+    // Virtual numpad listeners
+    document.querySelectorAll('.numpad-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            processInput(e.currentTarget.getAttribute('data-val'));
+        });
+    });
+
+    // Physical keyboard fallback
+    document.addEventListener('keydown', e => {
+        if (state.isTestActive && e.key >= '0' && e.key <= '9') {
+            processInput(e.key);
+        }
+    });
+
+    // Cancel test
+    document.getElementById('btn-cancel-test').addEventListener('click', () => {
+        if (confirm('Akhiri sesi ini?')) {
+            state.isTestActive = false;
+            stopTimer();
+            renderDashboard();
+            switchView('dashboard');
+        }
+    });
+
+    // ============================
+    //  FINISH & REVIEW
+    // ============================
+    function finishTest() {
+        const correct = state.answers.filter(a => a.isCorrect).length;
+        const total   = state.answers.length;
+        const score   = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+        // Persist result
+        const pkg        = state.packages[state.currentPackageIndex];
+        pkg.completed    = true;
+        pkg.score        = score;
+        pkg.time         = state.sessionTime;
+
+        renderReview();
+        switchView('review');
+    }
+
+    function renderReview() {
+        const pkg          = state.packages[state.currentPackageIndex];
+        const wrong        = state.answers.filter(a => !a.isCorrect);
+        const correct      = state.answers.length - wrong.length;
+        const accuracy     = state.answers.length > 0
+            ? Math.round((correct / state.answers.length) * 100) : 0;
+        const nextIdx      = state.currentPackageIndex + 1;
+
+        // Pkg label
+        document.getElementById('review-pkg-label').textContent =
+            `${pkg.title} · Selesai dalam ${formatTime(state.sessionTime)}`;
+
+        // Stats row
+        document.getElementById('review-stats').innerHTML = `
+            <div class="text-center">
+                <div class="text-2xl font-extrabold text-slate-900 mono">${state.answers.length}</div>
+                <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Total</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-extrabold mono ${accuracy >= 80 ? 'text-emerald-600' : accuracy >= 60 ? 'text-amber-500' : 'text-red-500'}">${accuracy}%</div>
+                <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Akurasi</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-extrabold text-blue-600 mono">${formatTime(state.sessionTime)}</div>
+                <div class="text-[11px] font-semibold text-slate-400 mt-1 uppercase tracking-wide">Waktu</div>
+            </div>
+        `;
+
+        // Wrong answers
+        const container = document.getElementById('wrong-answers-container');
+        container.innerHTML = '';
+
+        if (wrong.length === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full py-10 text-center">
+                    <div class="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-extrabold text-slate-800">Sempurna!</h3>
+                    <p class="text-sm text-slate-400 mt-1">Seluruh komputasi valid — 100% akurasi.</p>
+                </div>`;
+        } else {
+            const header = document.createElement('p');
+            header.className = 'text-xs font-bold text-slate-400 uppercase tracking-widest mono mb-3';
+            header.textContent = `${wrong.length} Anomali Ditemukan`;
+            container.appendChild(header);
+
+            wrong.forEach(ans => {
+                const item = document.createElement('div');
+                item.className = 'bg-red-50 border border-red-100 p-3.5 rounded-xl mb-2.5 flex items-center justify-between';
+                item.innerHTML = `
+                    <div class="flex items-center gap-5">
+                        <div class="mono text-center text-sm">
+                            <div class="text-slate-600 font-bold">${ans.num1}</div>
+                            <div class="text-slate-400 text-xs">+${ans.num2}</div>
+                            <div class="border-t border-slate-200 mt-1 pt-1 font-extrabold text-slate-700">${(ans.num1 + ans.num2) % 10}</div>
+                        </div>
+                        <div class="text-sm">
+                            <div class="text-slate-500">Kunci: <span class="font-extrabold text-emerald-600 mono">${ans.expectedAnswer}</span></div>
+                            <div class="text-slate-500">Input: <span class="font-extrabold text-red-500 mono">${ans.userAnswer}</span></div>
+                        </div>
+                    </div>
+                    <div class="w-7 h-7 bg-red-100 text-red-400 rounded-full flex items-center justify-center text-sm">✕</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Next package button
+        const nextBtn = document.getElementById('btn-next-package');
+        if (nextIdx < TOTAL_PACKAGES) {
+            nextBtn.classList.remove('hidden');
+            nextBtn.textContent = `Lanjut ${state.packages[nextIdx].title} →`;
+            nextBtn.onclick = () => startTest(nextIdx);
+        } else {
+            nextBtn.classList.add('hidden');
+        }
+    }
+
+    // Back to dashboard
+    document.getElementById('btn-back-dashboard').addEventListener('click', () => {
+        renderDashboard();
+        switchView('dashboard');
+    });
+    </script>
+</body>
+</html>
