@@ -915,9 +915,8 @@ function processInput(valStr) {
         : (pkg.numbers[idx] * pkg.numbers[idx+1]) % 10;
     const isCorrect = userAns === expected;
 
-    // Efek getar saat jawaban salah
+    // Shake visual saat jawaban salah
     if (!isCorrect) {
-        if (navigator.vibrate) navigator.vibrate([80, 30, 80]);
         const wrongBox = document.getElementById(`b${idx}`);
         if (wrongBox) {
             wrongBox.classList.add('shake');
@@ -941,6 +940,25 @@ function processInput(valStr) {
         document.getElementById('progress-bar-fill').style.width = '100%';
         setTimeout(finishTest, 550);
     }
+
+    return isCorrect;
+}
+
+// ═══ WRONG SOUND (Web Audio API — works on iOS & Android) ═══
+function playWrongSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(120, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+    } catch(e) {}
 }
 
 // Numpad listeners
@@ -951,7 +969,13 @@ document.querySelectorAll('.numpad-btn').forEach(btn => {
         e.preventDefault();
         touchFired = true;
         btn.classList.add('pressed');
-        processInput(btn.getAttribute('data-val'));
+        const correct = processInput(btn.getAttribute('data-val'));
+        if (correct === false) {
+            // Android: vibrate langsung di event handler level (lebih reliable)
+            try { navigator.vibrate && navigator.vibrate([80, 30, 80]); } catch(e) {}
+            // iOS + semua platform: bunyi buzz via Web Audio API
+            playWrongSound();
+        }
     }, { passive: false });
 
     btn.addEventListener('touchend', () => {
